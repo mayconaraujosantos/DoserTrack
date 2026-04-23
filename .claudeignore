@@ -1,0 +1,104 @@
+# ============================================
+# 🔴 CRÍTICO - MAIORES CONSUMIDORES DE TOKENS
+# ============================================
+
+# Dependências (MAIOR vilão!)
+node_modules/
+.venv/
+venv/
+vendor/
+__pycache__/
+.pnp.*
+
+# Builds e código gerado
+dist/
+build/
+.next/
+out/
+target/
+*.generated.ts
+*.generated.go
+*.pb.go
+
+# ============================================
+# 📁 LOGS E DADOS (poluem o contexto)
+# ============================================
+
+*.log
+*.tmp
+.cache/
+.temp/
+*.parquet
+*.csv
+data/raw/
+uploads/
+imports/
+exports/
+
+# Logs do Airflow ( +15% custo se não ignorar!)
+airflow/logs/
+
+# ============================================
+# 🔒 SEGURANÇA (nunca devem ir para IA)
+# ============================================
+
+.env
+.env.*
+*.pem
+*.key
+secrets/
+config/secrets.yml
+
+# ============================================
+# 🧪 TESTES E COBERTURA
+# ============================================
+
+coverage/
+.nyc_output/
+__snapshots__/
+*.test.ts      # opcional: se não estiver trabalhando em testes
+
+# ============================================
+# 📦 ARQUIVOS GRANDES E BINÁRIOS
+# ============================================
+
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.mp4
+*.mp3
+*.woff2
+*.sql
+*.dump
+
+# ============================================
+# 🗂️ MIGRAÇÕES E DADOS GERADOS
+# ============================================
+
+migrations/
+project/versions/
+
+# ============================================
+# ⚙️ IDE E SISTEMA
+# ============================================
+
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ============================================
+# 🔧 OUTROS (adicione conforme sua stack)
+# ============================================
+
+# Terraform
+terraform/.terraform/
+
+# Docker
+docker-compose.override.yml
+
+# Worktrees
+worktrees/

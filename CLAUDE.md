@@ -1,0 +1,3 @@
+- Escrever testes após o planejamento, antes da implementação
+- **NUNCA** pular quaisquer etapas do planejamento ou da implementação
+- Qualidade sobre velocidade. Há tempo suficiente para pensar cuidadosamente em cada etapa.
