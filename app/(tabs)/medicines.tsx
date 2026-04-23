@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getMedicines, deleteMedicine } from '@/lib/database';
 import { useAppStore } from '@/lib/store';
 import { useTheme, type ThemeColors } from '@/hooks/use-theme';
+import { haptic } from '@/lib/haptics';
 import { MedicineCardSkeleton } from '@/components/ui/skeleton';
 import type { Medicine, MedicineType } from '@/types';
 
@@ -75,13 +76,28 @@ function MedicineCard({ medicine, onDelete, onSchedule, onEdit }: Readonly<{
         </View>
       </View>
       <View style={styles.cardActions}>
-        <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(medicine.id)}>
+        <TouchableOpacity
+          style={styles.editBtn}
+          onPress={() => onEdit(medicine.id)}
+          accessibilityLabel={`Editar ${medicine.name}`}
+          accessibilityRole="button"
+        >
           <Ionicons name="pencil-outline" size={17} color={C.sub} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.scheduleBtn} onPress={() => onSchedule(medicine.id)}>
+        <TouchableOpacity
+          style={styles.scheduleBtn}
+          onPress={() => onSchedule(medicine.id)}
+          accessibilityLabel={`Configurar horários de ${medicine.name}`}
+          accessibilityRole="button"
+        >
           <Ionicons name="alarm-outline" size={17} color={C.primary} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.deleteBtn} onPress={() => onDelete(medicine.id)}>
+        <TouchableOpacity
+          style={styles.deleteBtn}
+          onPress={() => onDelete(medicine.id)}
+          accessibilityLabel={`Excluir ${medicine.name}`}
+          accessibilityRole="button"
+        >
           <Ionicons name="trash-outline" size={17} color={C.danger} />
         </TouchableOpacity>
       </View>
@@ -106,7 +122,10 @@ export default function MedicinesScreen() {
 
   const deleteMutation = useMutation({
     mutationFn: deleteMedicine,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['medicines'] }),
+    onSuccess: () => {
+      haptic.warning();
+      qc.invalidateQueries({ queryKey: ['medicines'] });
+    },
   });
 
   const confirmDelete = useCallback((id: number) => {
@@ -140,9 +159,24 @@ export default function MedicinesScreen() {
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.headerTitle}>Remédios</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/add-medicine' as never)}>
-          <Ionicons name="add" size={24} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.scanBtn}
+            onPress={() => router.push('/scan-prescription' as never)}
+            accessibilityLabel="Escanear receita"
+            accessibilityRole="button"
+          >
+            <Ionicons name="scan-outline" size={20} color={C.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={() => router.push('/add-medicine' as never)}
+            accessibilityLabel="Adicionar medicamento"
+            accessibilityRole="button"
+          >
+            <Ionicons name="add" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.searchContainer}>
@@ -198,6 +232,12 @@ function makeStyles(C: ThemeColors) {
       borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border,
     },
     headerTitle: { fontSize: 26, fontWeight: '700', color: C.text },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    scanBtn: {
+      width: 42, height: 42, borderRadius: 21,
+      alignItems: 'center', justifyContent: 'center',
+      backgroundColor: C.primary + '18', borderWidth: StyleSheet.hairlineWidth, borderColor: C.primary,
+    },
     addBtn: {
       backgroundColor: C.primary, width: 42, height: 42,
       borderRadius: 21, alignItems: 'center', justifyContent: 'center',

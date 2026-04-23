@@ -367,6 +367,60 @@ export async function getPendingDosesWithoutNotification(): Promise<Dose[]> {
   return rows.map(rowToDose);
 }
 
+export interface DayAdherence {
+  date: string; // YYYY-MM-DD
+  total: number;
+  taken: number;
+  rate: number; // 0-1
+}
+
+export async function getWeekAdherence(): Promise<DayAdherence[]> {
+  const profileId = requireActiveProfileId();
+  const rows = await db.getAllAsync<{ date: string; total: number; taken: number }>(`
+    SELECT
+      date(scheduled_time) as date,
+      COUNT(*) as total,
+      SUM(CASE WHEN status = 'taken' THEN 1 ELSE 0 END) as taken
+    FROM doses
+    WHERE profile_id = ?
+      AND date(scheduled_time) >= date('now', '-6 days')
+      AND date(scheduled_time) <= date('now')
+    GROUP BY date(scheduled_time)
+    ORDER BY date ASC
+  `, [profileId]);
+  return rows.map((r) => ({ ...r, rate: r.total > 0 ? r.taken / r.total : 0 }));
+}
+
+export async function getAdherenceStreak(): Promise<number> {
+  const profileId = requireActiveProfileId();
+  const rows = await db.getAllAsync<{ date: string; total: number; taken: number }>(`
+    SELECT
+      date(scheduled_time) as date,
+      COUNT(*) as total,
+      SUM(CASE WHEN status = 'taken' THEN 1 ELSE 0 END) as taken
+    FROM doses
+    WHERE profile_id = ?
+      AND date(scheduled_time) < date('now')
+      AND status != 'pending'
+    GROUP BY date(scheduled_time)
+    ORDER BY date DESC
+    LIMIT 90
+  `, [profileId]);
+
+  let streak = 0;
+  const today = new Date();
+  for (let i = 0; i < rows.length; i++) {
+    const expected = new Date(today);
+    expected.setDate(today.getDate() - (i + 1));
+    const expectedStr = expected.toISOString().slice(0, 10);
+    const row = rows[i];
+    if (row.date !== expectedStr) break;
+    if (row.total > 0 && row.taken / row.total >= 0.8) streak++;
+    else break;
+  }
+  return streak;
+}
+
 export async function getRecentHistory(limit = 50): Promise<Dose[]> {
   const profileId = requireActiveProfileId();
   const rows = await db.getAllAsync<Record<string, unknown>>(`

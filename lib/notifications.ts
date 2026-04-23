@@ -110,6 +110,35 @@ export async function rescheduleAllPendingDoses(): Promise<void> {
   }
 }
 
+export async function notifyLowStock(medicine: { name: string; stockQuantity: number; stockUnit: string }): Promise<void> {
+  if (IS_EXPO_GO) return;
+  const N = getNotifications();
+  await N.scheduleNotificationAsync({
+    content: {
+      title: 'Estoque baixo',
+      body: `${medicine.name} — restam apenas ${medicine.stockQuantity} ${medicine.stockUnit}`,
+      data: {},
+      sound: true,
+    },
+    trigger: null,
+  });
+}
+
+export async function notifyMissedDose(medicine: { name: string; dosage?: string }): Promise<void> {
+  if (IS_EXPO_GO) return;
+  const N = getNotifications();
+  const suffix = medicine.dosage ? ` — ${medicine.dosage}` : '';
+  await N.scheduleNotificationAsync({
+    content: {
+      title: 'Dose não registrada',
+      body: `Você tomou ${medicine.name}${suffix}?`,
+      data: {},
+      sound: true,
+    },
+    trigger: { type: N.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 30 * 60, repeats: false },
+  });
+}
+
 export function addNotificationResponseListener(
   callback: (response: import('expo-notifications').NotificationResponse) => void
 ): { remove: () => void } {

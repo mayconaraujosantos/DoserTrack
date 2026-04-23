@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Switch,
   FlatList,
   Alert,
   ActivityIndicator,
@@ -18,6 +19,7 @@ import { createProfile, getProfiles, setActiveProfileId } from '@/lib/database';
 import { setStoredActiveProfileId } from '@/lib/storage';
 import { useAppStore } from '@/lib/store';
 import { useTheme, type ThemeColors } from '@/hooks/use-theme';
+import { isBiometricsAvailable, isBiometricsEnabled, setBiometricsEnabled, authenticate } from '@/lib/biometrics';
 import type { Profile } from '@/types';
 
 const PROFILE_COLORS = ['#4A90D9', '#27AE60', '#F39C12', '#E74C3C', '#16A085', '#8E44AD'];
@@ -60,6 +62,22 @@ export default function ProfilesScreen() {
   const activeProfile = useAppStore((s) => s.activeProfile);
   const setActiveProfile = useAppStore((s) => s.setActiveProfile);
   const [name, setName] = useState('');
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioEnabled, setBioEnabled] = useState(false);
+
+  useEffect(() => {
+    isBiometricsAvailable().then(setBioAvailable);
+    isBiometricsEnabled().then(setBioEnabled);
+  }, []);
+
+  async function toggleBiometrics(value: boolean) {
+    if (value) {
+      const ok = await authenticate();
+      if (!ok) return;
+    }
+    await setBiometricsEnabled(value);
+    setBioEnabled(value);
+  }
 
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ['profiles'],
@@ -127,6 +145,24 @@ export default function ProfilesScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {bioAvailable && (
+        <View style={styles.secCard}>
+          <View style={styles.secRow}>
+            <Ionicons name="finger-print-outline" size={22} color={C.primary} />
+            <View style={styles.secInfo}>
+              <Text style={styles.secTitle}>Biometria</Text>
+              <Text style={styles.secSub}>Exigir digital ou Face ID ao retornar ao app</Text>
+            </View>
+            <Switch
+              value={bioEnabled}
+              onValueChange={toggleBiometrics}
+              trackColor={{ false: C.border, true: C.primary }}
+              thumbColor="#fff"
+            />
+          </View>
+        </View>
+      )}
 
       <Text style={styles.sectionTitle}>Perfis cadastrados</Text>
 
@@ -224,5 +260,13 @@ function makeStyles(C: ThemeColors) {
     profileInfo: { flex: 1 },
     profileName: { fontSize: 16, fontWeight: '700', color: C.text },
     profileMeta: { fontSize: 12, color: C.sub, marginTop: 3 },
+    secCard: {
+      marginHorizontal: 16, marginBottom: 16, padding: 16, borderRadius: 16,
+      backgroundColor: C.card, borderWidth: StyleSheet.hairlineWidth, borderColor: C.border,
+    },
+    secRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    secInfo: { flex: 1 },
+    secTitle: { fontSize: 15, fontWeight: '700', color: C.text },
+    secSub: { fontSize: 12, color: C.sub, marginTop: 2 },
   });
 }

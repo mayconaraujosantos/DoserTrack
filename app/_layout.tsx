@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { AppState, View, ActivityIndicator } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -16,7 +17,9 @@ import { queryClient } from '@/lib/query-client';
 import { useAppStore } from '@/lib/store';
 import { getStoredActiveProfileId, hasSeenOnboarding, setStoredActiveProfileId } from '@/lib/storage';
 import { onAuthStateChange } from '@/lib/auth';
-import { pullFromCloud } from '@/lib/sync';
+import { pullFromCloud, syncToCloud } from '@/lib/sync';
+import { isBiometricsEnabled, authenticate } from '@/lib/biometrics';
+import { ErrorBoundary } from '@/components/error-boundary';
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -53,6 +56,24 @@ export default function RootLayout() {
   const setDbReady = useAppStore((s) => s.setDbReady);
   const setActiveProfile = useAppStore((s) => s.setActiveProfile);
   const router = useRouter();
+  const [locked, setLocked] = useState(false);
+  const appState = useRef(AppState.currentState);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async (next) => {
+      const wasBackground = appState.current.match(/inactive|background/);
+      appState.current = next;
+      if (next === 'active' && wasBackground) {
+        syncToCloud().catch(console.error);
+        const enabled = await isBiometricsEnabled();
+        if (!enabled) return;
+        setLocked(true);
+        const ok = await authenticate();
+        if (ok) setLocked(false);
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     setupNotificationHandler();
@@ -91,7 +112,16 @@ export default function RootLayout() {
     };
   }, [router, setActiveProfile, setDbReady]);
 
+  if (locked) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
+        <ActivityIndicator color="#fff" size="large" />
+      </View>
+    );
+  }
+
   return (
+    <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkAppTheme : LightTheme}>
         <Stack>
@@ -127,5 +157,6 @@ export default function RootLayout() {
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       </ThemeProvider>
     </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

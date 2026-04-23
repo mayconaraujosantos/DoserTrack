@@ -3,12 +3,15 @@ import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, ActivityIndicator, Alert, Image,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { createMedicine } from '@/lib/database';
 import { useTheme, type ThemeColors } from '@/hooks/use-theme';
+import { haptic } from '@/lib/haptics';
+import { notifyLowStock } from '@/lib/notifications';
+import { syncToCloud } from '@/lib/sync';
 import type { MedicineType } from '@/types';
 
 const TYPES: { value: MedicineType; label: string; icon: string }[] = [
@@ -30,9 +33,27 @@ const UNITS: Record<MedicineType, string> = {
 };
 
 export default function AddMedicineScreen() {
-  const [name, setName] = useState('');
-  const [type, setType] = useState<MedicineType>('capsule');
-  const [stock, setStock] = useState('');
+  const params = useLocalSearchParams<{
+    prefill_name?: string;
+    prefill_type?: string;
+    prefill_quantity?: string;
+    prefill_concentration?: string;
+  }>();
+
+  const prefillType = (params.prefill_type as MedicineType | undefined);
+  const validTypes: MedicineType[] = ['capsule', 'tablet', 'drop', 'ml', 'injection', 'other'];
+  const resolvedType: MedicineType = prefillType && validTypes.includes(prefillType) ? prefillType : 'capsule';
+
+  let prefillName = '';
+  if (params.prefill_name) {
+    prefillName = params.prefill_concentration
+      ? `${params.prefill_name} ${params.prefill_concentration}`
+      : params.prefill_name;
+  }
+
+  const [name, setName] = useState(prefillName);
+  const [type, setType] = useState<MedicineType>(resolvedType);
+  const [stock, setStock] = useState(params.prefill_quantity ?? '');
   const [threshold, setThreshold] = useState('5');
   const [photoUri, setPhotoUri] = useState<string | undefined>();
 
@@ -43,11 +64,19 @@ export default function AddMedicineScreen() {
 
   const mutation = useMutation({
     mutationFn: createMedicine,
-    onSuccess: () => {
+    onSuccess: (medicine) => {
+      haptic.success();
+      if (medicine.stockQuantity <= medicine.lowStockThreshold) {
+        notifyLowStock(medicine).catch(console.error);
+      }
+      syncToCloud().catch(console.error);
       qc.invalidateQueries({ queryKey: ['medicines'] });
       router.back();
     },
-    onError: () => Alert.alert('Erro', 'Não foi possível salvar o medicamento.'),
+    onError: () => {
+      haptic.error();
+      Alert.alert('Erro', 'Não foi possível salvar o medicamento.');
+    },
   });
 
   async function pickPhoto() {
@@ -80,7 +109,12 @@ export default function AddMedicineScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <TouchableOpacity style={styles.photoBox} onPress={pickPhoto}>
+      <TouchableOpacity
+        style={styles.photoBox}
+        onPress={pickPhoto}
+        accessibilityLabel={photoUri ? 'Alterar foto do medicamento' : 'Adicionar foto do medicamento'}
+        accessibilityRole="button"
+      >
         {photoUri ? (
           <Image source={{ uri: photoUri }} style={styles.photoImg} />
         ) : (
@@ -155,6 +189,9 @@ export default function AddMedicineScreen() {
         style={[styles.submitBtn, mutation.isPending && styles.submitBtnDisabled]}
         onPress={submit}
         disabled={mutation.isPending}
+        accessibilityLabel="Salvar medicamento"
+        accessibilityRole="button"
+        accessibilityState={{ disabled: mutation.isPending }}
       >
         {mutation.isPending ? (
           <ActivityIndicator color="#fff" />

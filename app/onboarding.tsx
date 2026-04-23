@@ -19,16 +19,22 @@ const SLIDES = [
     subtitle: 'Seu assistente pessoal para nunca esquecer um remédio.',
   },
   {
+    key: 'scan',
+    icon: 'scan-outline' as const,
+    title: 'Escaneie sua receita',
+    subtitle: 'Fotografe a receita médica e o Doser preenche os medicamentos automaticamente com IA.',
+  },
+  {
     key: 'medicines',
     icon: 'medkit-outline' as const,
-    title: 'Cadastre seus medicamentos',
-    subtitle: 'Adicione seus remédios com nome, tipo, estoque e foto. Receba alertas quando o estoque estiver baixo.',
+    title: 'Controle seu estoque',
+    subtitle: 'Acompanhe a quantidade de cada medicamento e receba alertas antes de acabar.',
   },
   {
     key: 'schedule',
     icon: 'alarm-outline' as const,
-    title: 'Configure os lembretes',
-    subtitle: 'Defina a frequência — diária, intervalos ou ciclos. O Doser cuida dos horários e notifica na hora certa.',
+    title: 'Nunca esqueça uma dose',
+    subtitle: 'Defina a frequência — diária, intervalos ou ciclos. O Doser notifica na hora certa.',
   },
 ] as const;
 

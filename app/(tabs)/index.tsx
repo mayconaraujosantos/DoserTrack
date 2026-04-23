@@ -11,7 +11,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { getDosesForDate, updateDoseStatus } from '@/lib/database';
 import { useAppStore } from '@/lib/store';
 import { useTheme, type ThemeColors } from '@/hooks/use-theme';
+import { haptic } from '@/lib/haptics';
+import { notifyMissedDose } from '@/lib/notifications';
+import { syncToCloud } from '@/lib/sync';
 import { DoseCardSkeleton } from '@/components/ui/skeleton';
+import { AdherenceWidget } from '@/components/ui/adherence-widget';
 import type { Dose } from '@/types';
 
 type FilterTab = 'upcoming' | 'taken' | 'late';
@@ -53,15 +57,20 @@ function DoseCard({ dose, onCheck, onSkip, onEdit }: Readonly<{
   const color = stateColor(state, C);
   const label = stateLabel(state);
 
+  const time = formatTime(dose.scheduledTime);
   return (
-    <View style={[styles.card, state === 'taken' && styles.cardDone]}>
+    <View
+      style={[styles.card, state === 'taken' && styles.cardDone]}
+      accessible
+      accessibilityLabel={`${dose.medicineName}, ${dose.dosage ?? ''}, ${time}, ${label}`}
+    >
       <View style={[styles.timeBar, { backgroundColor: color }]} />
       {dose.medicinePhotoUri ? (
-        <Image source={{ uri: dose.medicinePhotoUri }} style={styles.photo} />
+        <Image source={{ uri: dose.medicinePhotoUri }} style={styles.photo} accessibilityIgnoresInvertColors />
       ) : null}
       <View style={styles.cardBody}>
         <View style={styles.cardTop}>
-          <Text style={styles.time}>{formatTime(dose.scheduledTime)}</Text>
+          <Text style={styles.time}>{time}</Text>
           <View style={[styles.badge, { backgroundColor: color + '22' }]}>
             <Text style={[styles.badgeText, { color }]}>{label}</Text>
           </View>
@@ -71,21 +80,41 @@ function DoseCard({ dose, onCheck, onSkip, onEdit }: Readonly<{
       </View>
       {state !== 'taken' && (
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.checkBtn} onPress={() => onCheck(dose.id)}>
+          <TouchableOpacity
+            style={styles.checkBtn}
+            onPress={() => onCheck(dose.id)}
+            accessibilityLabel={`Marcar ${dose.medicineName} como tomado`}
+            accessibilityRole="button"
+          >
             <Ionicons name="checkmark" size={22} color="#fff" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.skipBtn} onPress={() => onSkip(dose.id)}>
+          <TouchableOpacity
+            style={styles.skipBtn}
+            onPress={() => onSkip(dose.id)}
+            accessibilityLabel={`Pular dose de ${dose.medicineName}`}
+            accessibilityRole="button"
+          >
             <Ionicons name="close" size={18} color={C.sub} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(dose.id)}>
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() => onEdit(dose.id)}
+            accessibilityLabel="Editar dose"
+            accessibilityRole="button"
+          >
             <Ionicons name="pencil-outline" size={15} color={C.sub} />
           </TouchableOpacity>
         </View>
       )}
       {state === 'taken' && (
         <View style={styles.actions}>
-          <Ionicons name="checkmark-circle" size={26} color={C.success} />
-          <TouchableOpacity style={styles.editBtn} onPress={() => onEdit(dose.id)}>
+          <Ionicons name="checkmark-circle" size={26} color={C.success} accessibilityLabel="Tomado" />
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() => onEdit(dose.id)}
+            accessibilityLabel="Editar dose"
+            accessibilityRole="button"
+          >
             <Ionicons name="pencil-outline" size={15} color={C.sub} />
           </TouchableOpacity>
         </View>
@@ -114,12 +143,22 @@ export default function DashboardScreen() {
   const takeMutation = useMutation({
     mutationFn: (id: number) =>
       updateDoseStatus(id, 'taken', new Date().toISOString()),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['doses'] }),
+    onSuccess: () => {
+      haptic.success();
+      syncToCloud().catch(console.error);
+      qc.invalidateQueries({ queryKey: ['doses'] });
+    },
   });
 
   const skipMutation = useMutation({
     mutationFn: (id: number) => updateDoseStatus(id, 'skipped'),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['doses'] }),
+    onSuccess: (_, id) => {
+      haptic.warning();
+      syncToCloud().catch(console.error);
+      const dose = doses.find((d) => d.id === id);
+      if (dose) notifyMissedDose({ name: dose.medicineName ?? '', dosage: dose.dosage }).catch(console.error);
+      qc.invalidateQueries({ queryKey: ['doses'] });
+    },
   });
 
   const filtered = doses.filter((d) => {
@@ -152,20 +191,38 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <View>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+        <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>Hoje</Text>
           <Text style={styles.headerDate}>{dateLabel}</Text>
           {activeProfile ? (
             <TouchableOpacity onPress={() => router.push('/profiles' as never)} style={styles.profileChip}>
-              <Ionicons name="people-outline" size={14} color={C.primary} />
+              <Ionicons name="people-outline" size={13} color="rgba(255,255,255,0.8)" />
               <Text style={styles.profileChipText}>{activeProfile.name}</Text>
             </TouchableOpacity>
           ) : null}
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/add-medicine' as never)}>
-          <Ionicons name="add" size={24} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          {doses.length > 0 && (
+            <View style={styles.progressBox}>
+              <Text style={styles.progressLabel}>
+                {counts.taken}/{doses.length}
+              </Text>
+              <Text style={styles.progressSub}>doses</Text>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${Math.round((counts.taken / doses.length) * 100)}%` as unknown as number }]} />
+              </View>
+            </View>
+          )}
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.scanBtn} onPress={() => router.push('/scan-prescription' as never)}>
+              <Ionicons name="scan-outline" size={20} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/add-medicine' as never)}>
+              <Ionicons name="add" size={24} color={C.primary} />
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       <View style={styles.filterRow}>
@@ -186,6 +243,8 @@ export default function DashboardScreen() {
         })}
       </View>
 
+      <AdherenceWidget />
+
       {isLoading && (
         <View style={[styles.list, { gap: 10 }]}>
           {[1, 2, 3].map((k) => <DoseCardSkeleton key={k} />)}
@@ -194,7 +253,19 @@ export default function DashboardScreen() {
       {!isLoading && filtered.length === 0 && (
         <View style={styles.empty}>
           <Ionicons name="checkmark-circle-outline" size={56} color={C.border} />
-          <Text style={styles.emptyText}>Nenhum medicamento aqui</Text>
+          <Text style={styles.emptyText}>Nenhuma dose para hoje</Text>
+          <View style={styles.emptyActions}>
+            <TouchableOpacity style={styles.emptyActionCard} onPress={() => router.push('/scan-prescription' as never)}>
+              <Ionicons name="scan-outline" size={28} color={C.primary} />
+              <Text style={styles.emptyActionTitle}>Escanear Receita</Text>
+              <Text style={styles.emptyActionSub}>Fotografe e cadastre{'\n'}medicamentos automaticamente</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.emptyActionCard} onPress={() => router.push('/add-medicine' as never)}>
+              <Ionicons name="add-circle-outline" size={28} color={C.primary} />
+              <Text style={styles.emptyActionTitle}>Adicionar Manual</Text>
+              <Text style={styles.emptyActionSub}>Digite os dados do{'\n'}medicamento manualmente</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
       {!isLoading && filtered.length > 0 && (
@@ -214,43 +285,61 @@ function makeStyles(C: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: C.bg },
     header: {
-      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-      backgroundColor: C.card, paddingHorizontal: 20, paddingBottom: 16,
-      borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border,
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+      backgroundColor: C.primary, paddingHorizontal: 20, paddingBottom: 20,
     },
-    headerTitle: { fontSize: 26, fontWeight: '700', color: C.text },
-    headerDate: { fontSize: 13, color: C.sub, marginTop: 2, textTransform: 'capitalize' },
+    headerLeft: { flex: 1 },
+    headerRight: { alignItems: 'flex-end', gap: 10 },
+    headerTitle: { fontSize: 28, fontWeight: '800', color: '#fff' },
+    headerDate: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 2, textTransform: 'capitalize' },
     profileChip: {
-      marginTop: 10,
-      alignSelf: 'flex-start',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: 999,
-      backgroundColor: C.primary + '12',
+      marginTop: 10, alignSelf: 'flex-start',
+      flexDirection: 'row', alignItems: 'center', gap: 6,
+      paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
+      backgroundColor: 'rgba(255,255,255,0.18)',
     },
-    profileChipText: { color: C.primary, fontSize: 12, fontWeight: '700' },
+    profileChipText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+    progressBox: { alignItems: 'flex-end', gap: 2 },
+    progressLabel: { fontSize: 20, fontWeight: '800', color: '#fff', lineHeight: 22 },
+    progressSub: { fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: -2 },
+    progressTrack: {
+      width: 56, height: 4, borderRadius: 2,
+      backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden',
+    },
+    progressFill: { height: 4, borderRadius: 2, backgroundColor: '#fff' },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    scanBtn: {
+      width: 42, height: 42, borderRadius: 21,
+      alignItems: 'center', justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.18)',
+    },
     addBtn: {
-      backgroundColor: C.primary, width: 42, height: 42,
+      backgroundColor: '#fff', width: 42, height: 42,
       borderRadius: 21, alignItems: 'center', justifyContent: 'center',
     },
     filterRow: {
-      flexDirection: 'row', backgroundColor: C.card,
-      paddingHorizontal: 16, paddingBottom: 12, paddingTop: 4, gap: 8,
+      flexDirection: 'row', backgroundColor: C.primary,
+      paddingHorizontal: 16, paddingBottom: 14, paddingTop: 0, gap: 8,
     },
     filterTab: {
       flex: 1, paddingVertical: 7, borderRadius: 20,
-      alignItems: 'center', backgroundColor: C.bg,
+      alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)',
     },
-    filterTabActive: { backgroundColor: C.primary },
-    filterText: { fontSize: 12, color: C.sub, fontWeight: '500' },
-    filterTextActive: { color: '#fff' },
+    filterTabActive: { backgroundColor: '#fff' },
+    filterText: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
+    filterTextActive: { color: C.primary, fontWeight: '700' },
     list: { padding: 16, gap: 10 },
     loader: { flex: 1 },
-    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 20 },
     emptyText: { fontSize: 16, color: C.sub },
+    emptyActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
+    emptyActionCard: {
+      flex: 1, backgroundColor: C.card, borderRadius: 16, padding: 16,
+      alignItems: 'center', gap: 8,
+      borderWidth: StyleSheet.hairlineWidth, borderColor: C.border,
+    },
+    emptyActionTitle: { fontSize: 14, fontWeight: '700', color: C.text, textAlign: 'center' },
+    emptyActionSub: { fontSize: 11, color: C.sub, textAlign: 'center', lineHeight: 16 },
     card: {
       flexDirection: 'row', backgroundColor: C.card, borderRadius: 14,
       overflow: 'hidden', elevation: 2, shadowColor: '#000',
