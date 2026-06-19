@@ -1,5 +1,5 @@
-import { Platform } from 'react-native';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { Platform } from 'react-native';
 
 // expo-notifications crashes on import in Expo Go (SDK 53+).
 // All usages are guarded: the module is only require()'d at call time.
@@ -30,7 +30,6 @@ export function setupNotificationHandler() {
   const N = getNotifications();
   N.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
       shouldShowBanner: true,
@@ -65,14 +64,17 @@ export async function scheduleDoseNotification(dose: {
   }
 }
 
-export async function scheduleSnoozeNotification(dose: {
-  id: number;
-  medicineName: string;
-  dosage: string;
-}): Promise<string | null> {
+export async function scheduleSnoozeNotification(
+  dose: {
+    id: number;
+    medicineName: string;
+    dosage: string;
+  },
+  minutes = 10
+): Promise<string | null> {
   if (IS_EXPO_GO) return null;
   const N = getNotifications();
-  const trigger = new Date(Date.now() + 10 * 60 * 1000);
+  const trigger = new Date(Date.now() + minutes * 60 * 1000);
   try {
     const id = await N.scheduleNotificationAsync({
       content: {
@@ -97,7 +99,8 @@ export async function cancelNotification(notificationId: string): Promise<void> 
 
 export async function rescheduleAllPendingDoses(): Promise<void> {
   if (IS_EXPO_GO) return;
-  const { getPendingDosesWithoutNotification, updateDoseNotificationId } = await import('@/lib/database');
+  const { getPendingDosesWithoutNotification, updateDoseNotificationId } =
+    await import('@/lib/database');
   const doses = await getPendingDosesWithoutNotification();
   for (const dose of doses) {
     const notifId = await scheduleDoseNotification({
@@ -110,7 +113,11 @@ export async function rescheduleAllPendingDoses(): Promise<void> {
   }
 }
 
-export async function notifyLowStock(medicine: { name: string; stockQuantity: number; stockUnit: string }): Promise<void> {
+export async function notifyLowStock(medicine: {
+  name: string;
+  stockQuantity: number;
+  stockUnit: string;
+}): Promise<void> {
   if (IS_EXPO_GO) return;
   const N = getNotifications();
   await N.scheduleNotificationAsync({
@@ -135,7 +142,11 @@ export async function notifyMissedDose(medicine: { name: string; dosage?: string
       data: {},
       sound: true,
     },
-    trigger: { type: N.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 30 * 60, repeats: false },
+    trigger: {
+      type: N.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      seconds: 30 * 60,
+      repeats: false,
+    },
   });
 }
 

@@ -1,6 +1,7 @@
 # Update Todos
 
 ## Export PDF
+
 - [x] Instalar `expo-print`
 - [x] Instalar `expo-sharing`
 - [x] Criar `lib/report.ts`
@@ -13,6 +14,7 @@
 - [x] Conectar estado `exporting` com loading/erro na UI
 
 ## Múltiplos perfis
+
 - [x] Criar migração/tabela de perfis no banco
 - [x] Adicionar `Profile` nos tipos
 - [x] Adicionar `profileId` nas entidades relacionadas
@@ -22,18 +24,20 @@
 - [x] Filtrar queries e operações do banco por perfil
 
 ## Supabase
-- [ ] Criar `lib/supabase.ts`
-- [ ] Criar `lib/auth.ts`
-- [ ] Criar `lib/sync.ts`
-- [ ] Criar `app/auth.tsx`
-- [ ] Criar `app/auth-callback.tsx`
-- [ ] Criar `.env.example`
-- [ ] Atualizar `app.json` para auth/deep link, se necessário
-- [ ] Adicionar dependências do Supabase
-- [ ] Integrar autenticação com o fluxo do app
-- [ ] Implementar sincronização entre SQLite local e Supabase
+
+- [x] Criar `lib/supabase.ts`
+- [x] Criar `lib/auth.ts`
+- [x] Criar `lib/sync.ts`
+- [x] Criar `app/auth.tsx`
+- [x] Criar `app/auth-callback.tsx`
+- [x] Criar `.env.example`
+- [x] Atualizar `app.json` para auth/deep link, se necessário
+- [x] Adicionar dependências do Supabase
+- [x] Integrar autenticação com o fluxo do app
+- [x] Implementar sincronização entre SQLite local e Supabase
 
 ## Widget
+
 - [ ] Adicionar config plugin no `app.json`
 - [ ] Criar bridge de dados entre app e widget
 - [ ] Implementar Android AppWidget

@@ -1,0 +1,160 @@
+{
+  "agents": [
+    {
+      "name": "backend-database",
+      "label": "Backend/Database Agent",
+      "description": "Manages SQLite database operations, migrations, queries, and data layer. Expert in query optimization and sync patterns.",
+      "instructions": "You are a database specialist for the Doser app. Focus on SQLite operations, migrations, data relationships, and performance optimization. Always consider profile isolation in all queries.",
+      "applyTo": {
+        "include": [
+          "lib/database.ts",
+          "lib/sync.ts",
+          "__tests__/database*",
+          "__tests__/integration/*sync*"
+        ],
+        "exclude": []
+      }
+    },
+    {
+      "name": "frontend-ui",
+      "label": "Frontend/UI Agent",
+      "description": "Builds UI components, screens, and navigation flows with Expo React Native.",
+      "instructions": "You are a React Native UI specialist. Focus on component design, screen layouts, navigation, and styling. Follow the code-style.md guidelines for component patterns.",
+      "applyTo": {
+        "include": ["app/**/*.tsx", "components/**/*.tsx", "hooks/**/*.ts"],
+        "exclude": []
+      }
+    },
+    {
+      "name": "auth-security",
+      "label": "Authentication & Security Agent",
+      "description": "Handles auth flows, biometrics, security, and data protection.",
+      "instructions": "You are a security specialist. Focus on Supabase authentication, biometric integration, secure storage, and compliance. Always refer to security-rules.md for policies.",
+      "applyTo": {
+        "include": ["lib/auth.ts", "lib/biometrics.ts", "__tests__/*auth*"],
+        "exclude": []
+      }
+    },
+    {
+      "name": "sync-api",
+      "label": "Data Sync & API Agent",
+      "description": "Manages Supabase sync, API integration, cloud communication, and conflict resolution.",
+      "instructions": "You are an API and sync specialist. Focus on Supabase integration, offline-first patterns, conflict resolution, and real-time subscriptions.",
+      "applyTo": {
+        "include": [
+          "lib/supabase.ts",
+          "lib/sync.ts",
+          "lib/sync-retry.ts",
+          "__tests__/integration/*sync*"
+        ],
+        "exclude": []
+      }
+    },
+    {
+      "name": "testing-quality",
+      "label": "Testing & Quality Agent",
+      "description": "Writes and maintains tests, ensures code quality and coverage.",
+      "instructions": "You are a QA specialist. Write tests BEFORE implementation. Focus on unit tests, integration tests, and maintaining >80% coverage. Follow TDD principles.",
+      "applyTo": {
+        "include": ["__tests__/**", "jest.config.js"],
+        "exclude": []
+      }
+    },
+    {
+      "name": "features-modules",
+      "label": "Features & Modules Agent",
+      "description": "Builds new features and feature-specific modules like medicine management, notifications, and reports.",
+      "instructions": "You are a feature development specialist. Build complete features including UI, logic, and tests. Focus on profiles, medicines, schedules, notifications, and reports.",
+      "applyTo": {
+        "include": [
+          "lib/medicines.ts",
+          "lib/schedules.ts",
+          "lib/history.ts",
+          "lib/notifications.ts",
+          "lib/report.ts",
+          "lib/profiles.ts"
+        ],
+        "exclude": []
+      }
+    },
+    {
+      "name": "devops-build",
+      "label": "DevOps & Build Agent",
+      "description": "Handles build processes, deployment, and CI/CD configuration.",
+      "instructions": "You are a DevOps specialist. Focus on Expo builds, Android/iOS configuration, EAS setup, and deployment pipelines.",
+      "applyTo": {
+        "include": ["eas.json", "app.json", ".github/workflows", "android/**", "ios/**"],
+        "exclude": []
+      }
+    },
+    {
+      "name": "architecture",
+      "label": "Architecture & Refactoring Agent",
+      "description": "Designs system improvements, architecture decisions, and refactoring.",
+      "instructions": "You are an architecture specialist. Focus on system design, code organization, performance optimization, and large-scale refactoring. Refer to system-architecture.md.",
+      "applyTo": {
+        "include": ["types/**", "lib/**/*.ts", "constants/**"],
+        "exclude": []
+      }
+    },
+    {
+      "name": "documentation",
+      "label": "Documentation Agent",
+      "description": "Creates and maintains documentation, specs, and guides.",
+      "instructions": "You are a documentation specialist. Create clear, comprehensive documentation including API docs, architecture guides, and developer guides.",
+      "applyTo": {
+        "include": ["README.md", ".claudecode/specs/**", ".claudecode/skills/**", "docs/**"],
+        "exclude": []
+      }
+    }
+  ],
+  "skills": [
+    {
+      "id": "test-database",
+      "title": "Database Testing & Operations",
+      "description": "Test SQLite database operations, migrations, queries"
+    },
+    {
+      "id": "setup-auth",
+      "title": "Authentication & Biometrics Setup",
+      "description": "Implement Supabase auth and biometric authentication"
+    },
+    {
+      "id": "sync-data",
+      "title": "Data Synchronization & Offline-First",
+      "description": "Implement offline-first sync with Supabase"
+    },
+    {
+      "id": "manage-profiles",
+      "title": "Profile & Medicine Management",
+      "description": "Manage profiles, medicines, schedules, and dose history"
+    },
+    {
+      "id": "generate-reports",
+      "title": "Reports, Exports & PDFs",
+      "description": "Generate reports, export data, and create PDFs"
+    },
+    {
+      "id": "testing-qa",
+      "title": "Testing & Quality Assurance",
+      "description": "Write tests, run test suites, maintain code quality"
+    }
+  ],
+  "specs": [
+    {
+      "id": "system-architecture",
+      "title": "System Architecture",
+      "description": "Complete architecture overview, data flows, and design patterns"
+    },
+    {
+      "id": "code-style",
+      "title": "Code Style Guide",
+      "description": "TypeScript, React, naming conventions, and patterns"
+    },
+    {
+      "id": "security-rules",
+      "title": "Security Rules",
+      "description": "Authentication, data protection, permissions, and compliance"
+    }
+  ]
+}

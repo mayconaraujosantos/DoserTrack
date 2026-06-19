@@ -1,24 +1,30 @@
 import { useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { getWeekAdherence, getAdherenceStreak } from '@/lib/database';
 import { useAppStore } from '@/lib/store';
-import { useTheme, type ThemeColors } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/use-theme';
+import { Text } from '@/components/ui/Text';
 
 const DAY_LABELS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
-function rateColor(rate: number, C: ThemeColors): string {
-  if (rate >= 0.8) return C.success;
-  if (rate >= 0.5) return C.warning;
-  if (rate > 0) return C.danger;
-  return C.border;
+function rateColor(
+  rate: number,
+  success: string,
+  warning: string,
+  danger: string,
+  border: string
+): string {
+  if (rate >= 0.8) return success;
+  if (rate >= 0.5) return warning;
+  if (rate > 0) return danger;
+  return border;
 }
 
 export function AdherenceWidget() {
   const C = useTheme();
-  const styles = useMemo(() => makeStyles(C), [C]);
-  const dbReady = useAppStore((s) => s.dbReady);
+  const dbReady = useAppStore(s => s.dbReady);
 
   const { data: week = [] } = useQuery({
     queryKey: ['week-adherence'],
@@ -33,7 +39,7 @@ export function AdherenceWidget() {
   });
 
   const last7 = useMemo(() => {
-    const map = new Map(week.map((d) => [d.date, d]));
+    const map = new Map(week.map(d => [d.date, d]));
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
@@ -46,13 +52,13 @@ export function AdherenceWidget() {
   if (week.length === 0 && streak === 0) return null;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: C.card, borderColor: C.border }]}>
       <View style={styles.streakRow}>
         <Ionicons name="flame" size={18} color={streak > 0 ? C.warning : C.border} />
-        <Text style={[styles.streakCount, { color: streak > 0 ? C.warning : C.sub }]}>
+        <Text variant="title" color={streak > 0 ? C.warning : C.sub} style={styles.streakCount}>
           {streak}
         </Text>
-        <Text style={styles.streakLabel}>
+        <Text variant="caption" color={C.sub}>
           {streak === 1 ? 'dia consecutivo' : 'dias consecutivos'}
         </Text>
       </View>
@@ -61,14 +67,18 @@ export function AdherenceWidget() {
         {last7.map(({ key, label, data }) => {
           const rate = data?.rate ?? -1;
           const hasData = rate >= 0;
-          const color = hasData ? rateColor(rate, C) : C.border;
+          const color = hasData
+            ? rateColor(rate, C.success, C.warning, C.danger, C.border)
+            : C.border;
           const height = hasData && rate > 0 ? Math.max(6, Math.round(rate * 32)) : 6;
           return (
             <View key={key} style={styles.barCol}>
-              <View style={styles.barTrack}>
+              <View style={[styles.barTrack, { backgroundColor: C.bg }]}>
                 <View style={[styles.barFill, { height, backgroundColor: color }]} />
               </View>
-              <Text style={styles.barLabel}>{label}</Text>
+              <Text variant="caption" color={C.sub} style={styles.barLabel}>
+                {label}
+              </Text>
             </View>
           );
         })}
@@ -77,22 +87,24 @@ export function AdherenceWidget() {
   );
 }
 
-function makeStyles(C: ThemeColors) {
-  return StyleSheet.create({
-    container: {
-      backgroundColor: C.card, borderRadius: 16, padding: 16, marginHorizontal: 16,
-      borderWidth: StyleSheet.hairlineWidth, borderColor: C.border,
-    },
-    streakRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
-    streakCount: { fontSize: 20, fontWeight: '800' },
-    streakLabel: { fontSize: 13, color: C.sub, fontWeight: '500' },
-    bars: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-    barCol: { alignItems: 'center', gap: 6, flex: 1 },
-    barTrack: {
-      width: 20, height: 32, borderRadius: 6,
-      backgroundColor: C.bg, justifyContent: 'flex-end', overflow: 'hidden',
-    },
-    barFill: { width: '100%', borderRadius: 6 },
-    barLabel: { fontSize: 11, color: C.sub, fontWeight: '500' },
-  });
-}
+const styles = StyleSheet.create({
+  container: {
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  streakRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
+  streakCount: { fontSize: 20, fontWeight: '800' },
+  bars: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  barCol: { alignItems: 'center', gap: 6, flex: 1 },
+  barTrack: {
+    width: 20,
+    height: 32,
+    borderRadius: 6,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  barFill: { width: '100%', borderRadius: 6 },
+  barLabel: { fontWeight: '500' },
+});

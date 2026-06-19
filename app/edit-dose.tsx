@@ -1,33 +1,52 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useTheme } from '@/hooks/use-theme';
 import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ScrollView, ActivityIndicator, Alert, Platform,
-} from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { Ionicons } from '@expo/vector-icons';
-import { getDoseById, updateDoseStatus } from '@/lib/database';
+  getDoseById,
+  getDosesForDate,
+  realignIntervalSchedule,
+  updateDoseNotificationId,
+  updateDoseStatus,
+} from '@/lib/database';
+import { scheduleDoseNotification } from '@/lib/notifications';
 import { useAppStore } from '@/lib/store';
-import { useTheme, type ThemeColors } from '@/hooks/use-theme';
 import type { DoseStatus } from '@/types';
+import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Text } from '@/components/ui/Text';
 
 const STATUS_OPTIONS: { value: DoseStatus; label: string; icon: string; desc: string }[] = [
-  { value: 'taken',   label: 'Tomado',   icon: 'checkmark-circle', desc: 'Dose foi tomada' },
-  { value: 'skipped', label: 'Pulado',   icon: 'close-circle',     desc: 'Dose foi pulada' },
-  { value: 'pending', label: 'Pendente', icon: 'time',             desc: 'Redefinir como pendente' },
+  { value: 'taken', label: 'Tomado', icon: 'checkmark-circle', desc: 'Dose foi tomada' },
+  { value: 'skipped', label: 'Pulado', icon: 'close-circle', desc: 'Dose foi pulada' },
+  { value: 'pending', label: 'Pendente', icon: 'time', desc: 'Redefinir como pendente' },
 ];
 
-function statusColor(value: DoseStatus, C: ThemeColors): string {
-  if (value === 'taken') return C.success;
-  if (value === 'skipped') return C.danger;
-  return C.sub;
+function statusColor(value: DoseStatus, success: string, danger: string, sub: string): string {
+  if (value === 'taken') return success;
+  if (value === 'skipped') return danger;
+  return sub;
 }
 
 function formatDateTime(iso: string) {
   return new Date(iso).toLocaleString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 }
 
@@ -42,8 +61,7 @@ export default function EditDoseScreen() {
   const doseId = Number.parseInt(id ?? '0');
 
   const C = useTheme();
-  const styles = useMemo(() => makeStyles(C), [C]);
-  const dbReady = useAppStore((s) => s.dbReady);
+  const dbReady = useAppStore(s => s.dbReady);
   const router = useRouter();
   const qc = useQueryClient();
 
@@ -66,68 +84,134 @@ export default function EditDoseScreen() {
     setSkipReason(dose.skipReason ?? '');
   }, [dose]);
 
+  function isTimeShifted(scheduledIso: string, taken: Date): boolean {
+    const scheduled = new Date(scheduledIso);
+    const diffMinutes = Math.abs(taken.getTime() - scheduled.getTime()) / 60_000;
+    return diffMinutes >= 5;
+  }
+
+  async function rescheduleAfterRealign(scheduleId: number) {
+    const now = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayDoses = await getDosesForDate(dateStr);
+      for (const futureDose of dayDoses) {
+        if (
+          futureDose.scheduleId === scheduleId &&
+          futureDose.status === 'pending' &&
+          new Date(futureDose.scheduledTime) > now &&
+          !futureDose.notificationId
+        ) {
+          const notifId = await scheduleDoseNotification({
+            id: futureDose.id,
+            medicineName: futureDose.medicineName ?? '',
+            dosage: futureDose.dosage ?? '',
+            scheduledTime: futureDose.scheduledTime,
+          });
+          if (notifId) await updateDoseNotificationId(futureDose.id, notifId);
+        }
+      }
+    }
+  }
+
   const mutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (): Promise<{ realigned: boolean }> => {
       if (status === 'taken') {
-        await updateDoseStatus(doseId, 'taken', takenDate.toISOString());
+        const takenIso = takenDate.toISOString();
+        await updateDoseStatus(doseId, 'taken', takenIso);
+        if (dose && isTimeShifted(dose.scheduledTime, takenDate)) {
+          await realignIntervalSchedule(dose.scheduleId, takenIso);
+          await rescheduleAfterRealign(dose.scheduleId);
+          return { realigned: true };
+        }
       } else if (status === 'skipped') {
         await updateDoseStatus(doseId, 'skipped', undefined, skipReason || undefined);
       } else {
         await updateDoseStatus(doseId, 'pending');
       }
+      return { realigned: false };
     },
-    onSuccess: () => {
+    onSuccess: ({ realigned }) => {
       qc.invalidateQueries({ queryKey: ['doses'] });
       qc.invalidateQueries({ queryKey: ['dose', doseId] });
       qc.invalidateQueries({ queryKey: ['history'] });
       qc.invalidateQueries({ queryKey: ['adherence'] });
-      router.back();
+      qc.invalidateQueries({ queryKey: ['schedules'] });
+      if (realigned) {
+        Alert.alert(
+          'Horários realinhados',
+          'As próximas doses foram reagendadas a partir do horário em que você tomou.',
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+      } else {
+        router.back();
+      }
     },
     onError: (e: Error) => Alert.alert('Erro', e.message),
   });
 
   if (isLoading || !dose) {
     return (
-      <View style={styles.loading}>
+      <View style={[styles.loading, { backgroundColor: C.bg }]}>
         <ActivityIndicator color={C.primary} size="large" />
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-
-      <View style={styles.infoCard}>
-        <Text style={styles.medicineName}>{dose.medicineName}</Text>
-        {dose.dosage ? <Text style={styles.dosage}>{dose.dosage}</Text> : null}
+    <ScrollView
+      style={[styles.container, { backgroundColor: C.bg }]}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
+      <Card variant="outlined" style={styles.infoCard}>
+        <Text variant="title">{dose.medicineName}</Text>
+        {dose.dosage ? <Text variant="sub">{dose.dosage}</Text> : null}
         <View style={styles.infoRow}>
           <Ionicons name="time-outline" size={14} color={C.sub} />
-          <Text style={styles.infoText}>Programado: {formatDateTime(dose.scheduledTime)}</Text>
+          <Text variant="caption" color={C.sub}>
+            Programado: {formatDateTime(dose.scheduledTime)}
+          </Text>
         </View>
         {dose.takenTime && (
           <View style={styles.infoRow}>
             <Ionicons name="checkmark-circle-outline" size={14} color={C.success} />
-            <Text style={[styles.infoText, { color: C.success }]}>
+            <Text variant="caption" color={C.success}>
               Tomado em: {formatDateTime(dose.takenTime)}
             </Text>
           </View>
         )}
-      </View>
+      </Card>
 
-      <Text style={styles.label}>Novo status</Text>
+      <Text variant="label" color={C.sub} style={styles.sectionLabel}>
+        Novo status
+      </Text>
       <View style={styles.statusGrid}>
-        {STATUS_OPTIONS.map((opt) => {
+        {STATUS_OPTIONS.map(opt => {
           const active = status === opt.value;
-          const color = statusColor(opt.value, C);
+          const color = statusColor(opt.value, C.success, C.danger, C.sub);
           return (
             <TouchableOpacity
               key={opt.value}
-              style={[styles.statusBtn, active && { borderColor: color, backgroundColor: color + '18' }]}
+              style={[
+                styles.statusBtn,
+                { backgroundColor: C.card, borderColor: active ? color : C.border },
+                active && { backgroundColor: color + '18' },
+              ]}
               onPress={() => setStatus(opt.value)}
+              accessibilityLabel={opt.label}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
             >
               <Ionicons name={opt.icon as never} size={22} color={active ? color : C.sub} />
-              <Text style={[styles.statusLabel, active && { color }]}>{opt.label}</Text>
-              <Text style={styles.statusDesc}>{opt.desc}</Text>
+              <Text variant="label" color={active ? color : C.sub}>
+                {opt.label}
+              </Text>
+              <Text variant="caption" color={C.sub} style={styles.statusDesc}>
+                {opt.desc}
+              </Text>
             </TouchableOpacity>
           );
         })}
@@ -136,25 +220,29 @@ export default function EditDoseScreen() {
       {status === 'taken' && (
         <View style={styles.dateTimeRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.label}>Data</Text>
+            <Text variant="label" color={C.sub} style={styles.sectionLabel}>
+              Data
+            </Text>
             <TouchableOpacity
               style={[styles.pickerBtn, { backgroundColor: C.card, borderColor: C.border }]}
               onPress={() => setShowDatePicker(true)}
             >
               <Ionicons name="calendar-outline" size={16} color={C.sub} />
-              <Text style={[styles.pickerBtnText, { color: C.text }]}>
+              <Text variant="body" color={C.text}>
                 {takenDate.toLocaleDateString('pt-BR')}
               </Text>
             </TouchableOpacity>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.label}>Hora</Text>
+            <Text variant="label" color={C.sub} style={styles.sectionLabel}>
+              Hora
+            </Text>
             <TouchableOpacity
               style={[styles.pickerBtn, { backgroundColor: C.card, borderColor: C.border }]}
               onPress={() => setShowTimePicker(true)}
             >
               <Ionicons name="time-outline" size={16} color={C.sub} />
-              <Text style={[styles.pickerBtnText, { color: C.text }]}>
+              <Text variant="body" color={C.text}>
                 {takenDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
               </Text>
             </TouchableOpacity>
@@ -194,73 +282,58 @@ export default function EditDoseScreen() {
       )}
 
       {status === 'skipped' && (
-        <View>
-          <Text style={styles.label}>Motivo (opcional)</Text>
-          <TextInput
-            style={[styles.input, styles.multiline]}
-            placeholder="Ex: Esqueci, estava dormindo..."
-            placeholderTextColor={C.sub}
-            value={skipReason}
-            onChangeText={setSkipReason}
-            multiline
-            numberOfLines={3}
-          />
-        </View>
+        <Input
+          label="Motivo (opcional)"
+          placeholder="Ex: Esqueci, estava dormindo..."
+          value={skipReason}
+          onChangeText={setSkipReason}
+          multiline
+          numberOfLines={3}
+          style={styles.multiline}
+        />
       )}
 
-      <TouchableOpacity
-        style={[styles.submitBtn, mutation.isPending && styles.submitBtnDisabled]}
+      <Button
+        variant="primary"
+        size="lg"
+        loading={mutation.isPending}
         onPress={() => mutation.mutate()}
-        disabled={mutation.isPending}
+        style={styles.submitBtn}
+        accessibilityLabel="Salvar alteração"
       >
-        {mutation.isPending ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.submitText}>Salvar alteração</Text>
-        )}
-      </TouchableOpacity>
+        Salvar alteração
+      </Button>
     </ScrollView>
   );
 }
 
-function makeStyles(C: ThemeColors) {
-  return StyleSheet.create({
-    loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
-    container: { flex: 1, backgroundColor: C.bg },
-    content: { padding: 20, gap: 12, paddingBottom: 40 },
-    infoCard: {
-      backgroundColor: C.card, borderRadius: 14, padding: 16, gap: 6,
-      borderWidth: StyleSheet.hairlineWidth, borderColor: C.border,
-    },
-    medicineName: { fontSize: 18, fontWeight: '700', color: C.text },
-    dosage: { fontSize: 14, color: C.sub },
-    infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
-    infoText: { fontSize: 13, color: C.sub },
-    label: { fontSize: 13, fontWeight: '600', color: C.sub, marginBottom: 4 },
-    statusGrid: { flexDirection: 'row', gap: 8 },
-    statusBtn: {
-      flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14, gap: 4,
-      backgroundColor: C.card, borderWidth: 1.5, borderColor: C.border,
-    },
-    statusLabel: { fontSize: 13, fontWeight: '700', color: C.sub },
-    statusDesc: { fontSize: 10, color: C.sub, textAlign: 'center' },
-    dateTimeRow: { flexDirection: 'row', gap: 10 },
-    pickerBtn: {
-      flexDirection: 'row', alignItems: 'center', gap: 8,
-      borderRadius: 12, paddingHorizontal: 12, height: 48,
-      borderWidth: StyleSheet.hairlineWidth,
-    },
-    pickerBtnText: { fontSize: 14 },
-    input: {
-      backgroundColor: C.card, borderRadius: 12, paddingHorizontal: 14, height: 48,
-      fontSize: 15, color: C.text, borderWidth: StyleSheet.hairlineWidth, borderColor: C.border,
-    },
-    multiline: { height: 80, paddingTop: 12, textAlignVertical: 'top' },
-    submitBtn: {
-      backgroundColor: C.primary, height: 52, borderRadius: 14,
-      alignItems: 'center', justifyContent: 'center', marginTop: 4,
-    },
-    submitBtnDisabled: { opacity: 0.6 },
-    submitText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  });
-}
+const styles = StyleSheet.create({
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1 },
+  content: { padding: 20, gap: 12, paddingBottom: 40 },
+  infoCard: { gap: 6 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  sectionLabel: { marginBottom: 4 },
+  statusGrid: { flexDirection: 'row', gap: 8 },
+  statusBtn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    gap: 4,
+    borderWidth: 1.5,
+  },
+  statusDesc: { textAlign: 'center' },
+  dateTimeRow: { flexDirection: 'row', gap: 10 },
+  pickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 48,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  multiline: { height: 80, textAlignVertical: 'top' },
+  submitBtn: { marginTop: 4 },
+});

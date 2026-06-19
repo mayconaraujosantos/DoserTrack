@@ -1,148 +1,390 @@
-import { useState, useCallback, useMemo } from 'react';
-import {
-  View, Text, FlatList, TouchableOpacity, Image,
-  StyleSheet, RefreshControl,
-  type ListRenderItemInfo,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Ionicons } from '@expo/vector-icons';
-import { getDosesForDate, updateDoseStatus } from '@/lib/database';
-import { useAppStore } from '@/lib/store';
-import { useTheme, type ThemeColors } from '@/hooks/use-theme';
+import { Text } from '@/components/ui/Text';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { getDosesForDate, getDosesForDateRange, updateDoseStatus } from '@/lib/database';
 import { haptic } from '@/lib/haptics';
-import { notifyMissedDose } from '@/lib/notifications';
+import { useAppStore } from '@/lib/store';
 import { syncToCloud } from '@/lib/sync';
-import { DoseCardSkeleton } from '@/components/ui/skeleton';
-import { AdherenceWidget } from '@/components/ui/adherence-widget';
 import type { Dose } from '@/types';
+import { Ionicons } from '@expo/vector-icons';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
+import {
+  Image,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-type FilterTab = 'upcoming' | 'taken' | 'late';
-type DoseState = 'late' | 'taken' | 'upcoming' | 'snoozed';
+// ─── Theme-aware palette ──────────────────────────────────────────────────────
 
-function getDoseState(dose: Dose): DoseState {
+const HOME_COLORS = {
+  light: {
+    bg: '#EAEBFF',
+    primary: '#1B1F4B',
+    card: '#FFFFFF',
+    sub: '#9294B0',
+    border: '#DFE0F0',
+  },
+  dark: {
+    bg: '#0F1117',
+    primary: '#E2E8F0',
+    card: '#1C2333',
+    sub: '#8899A6',
+    border: '#253047',
+  },
+} as const;
+
+type HomeColors = {
+  readonly bg: string;
+  readonly primary: string;
+  readonly card: string;
+  readonly sub: string;
+  readonly border: string;
+};
+
+function useHomeColors(): HomeColors {
+  const scheme = useColorScheme() ?? 'light';
+  return HOME_COLORS[scheme];
+}
+
+// ─── Status display ───────────────────────────────────────────────────────────
+
+const STATUS_COLOR = {
+  taken: '#4ECDC4',
+  late: '#FF6B6B',
+  pending: '#F9C74F',
+  snoozed: '#F4A261',
+  skipped: '#9294B0',
+} as const;
+
+const STATUS_LABEL = {
+  taken: 'Tomado',
+  late: 'Atrasado',
+  pending: 'Pendente',
+  snoozed: 'Adiado',
+  skipped: 'Pulado',
+} as const;
+
+type DisplayStatus = keyof typeof STATUS_COLOR;
+type FilterKey = 'all' | 'pending' | 'taken' | 'late';
+
+// ─── Day status (for calendar dots) ──────────────────────────────────────────
+
+type DayStatus = 'all_taken' | 'has_late' | 'has_pending';
+
+const STATUS_DOT_COLOR: Record<DayStatus, string> = {
+  all_taken: '#4ECDC4',
+  has_late: '#FF6B6B',
+  has_pending: '#F9C74F',
+};
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: 'all', label: 'Todos' },
+  { key: 'pending', label: 'Pendentes' },
+  { key: 'taken', label: 'Tomados' },
+  { key: 'late', label: 'Atrasados' },
+];
+
+// ─── Locale constants ─────────────────────────────────────────────────────────
+
+const DAYS_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const MONTHS_PT = [
+  'Janeiro',
+  'Fevereiro',
+  'Março',
+  'Abril',
+  'Maio',
+  'Junho',
+  'Julho',
+  'Agosto',
+  'Setembro',
+  'Outubro',
+  'Novembro',
+  'Dezembro',
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function getDisplayStatus(dose: Dose): DisplayStatus {
   if (dose.status === 'taken') return 'taken';
-  if (dose.status === 'skipped') return 'late';
+  if (dose.status === 'skipped') return 'skipped';
   if (dose.status === 'snoozed') return 'snoozed';
-  return new Date(dose.scheduledTime) < new Date() ? 'late' : 'upcoming';
+  if (new Date(dose.scheduledTime) < new Date()) return 'late';
+  return 'pending';
 }
 
-function stateColor(state: DoseState, C: ThemeColors): string {
-  if (state === 'taken') return C.success;
-  if (state === 'late') return C.danger;
-  return C.primary;
+function getSundayOf(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() - d.getDay());
+  return toLocalDateStr(d);
 }
 
-function stateLabel(state: DoseState): string {
-  if (state === 'taken') return 'Tomado';
-  if (state === 'late') return 'Atrasado';
-  if (state === 'snoozed') return 'Soneca';
-  return 'Pendente';
+function buildWeekFromAnchor(anchorStr: string) {
+  const anchor = new Date(anchorStr + 'T12:00:00');
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(anchor);
+    d.setDate(anchor.getDate() + i);
+    return { dateStr: toLocalDateStr(d), day: d.getDate(), dow: d.getDay() };
+  });
 }
 
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-}
+// ─── DoseCard ─────────────────────────────────────────────────────────────────
 
-function DoseCard({ dose, onCheck, onSkip, onEdit }: Readonly<{
+function DoseCard({
+  dose,
+  onTake,
+  onUntake,
+  onPress,
+}: Readonly<{
   dose: Dose;
-  onCheck: (id: number) => void;
-  onSkip: (id: number) => void;
-  onEdit: (id: number) => void;
+  onTake: (dose: Dose) => void;
+  onUntake: (dose: Dose) => void;
+  onPress: (id: number) => void;
 }>) {
-  const C = useTheme();
-  const styles = useMemo(() => makeStyles(C), [C]);
-  const state = getDoseState(dose);
-  const color = stateColor(state, C);
-  const label = stateLabel(state);
+  const C = useHomeColors();
+  const displayStatus = getDisplayStatus(dose);
+  const color = STATUS_COLOR[displayStatus];
+  const isTaken = displayStatus === 'taken';
+  const canToggle =
+    displayStatus === 'taken' || displayStatus === 'pending' || displayStatus === 'late';
 
-  const time = formatTime(dose.scheduledTime);
   return (
-    <View
-      style={[styles.card, state === 'taken' && styles.cardDone]}
-      accessible
-      accessibilityLabel={`${dose.medicineName}, ${dose.dosage ?? ''}, ${time}, ${label}`}
+    <TouchableOpacity
+      style={[
+        styles.card,
+        { backgroundColor: C.card, shadowColor: C.primary },
+        isTaken && styles.cardDone,
+      ]}
+      onPress={() => onPress(dose.id)}
+      activeOpacity={0.82}
+      accessibilityRole="button"
+      accessibilityLabel={`${dose.medicineName}, ${STATUS_LABEL[displayStatus]}`}
+      accessibilityState={{ checked: isTaken }}
     >
-      <View style={[styles.timeBar, { backgroundColor: color }]} />
-      {dose.medicinePhotoUri ? (
-        <Image source={{ uri: dose.medicinePhotoUri }} style={styles.photo} accessibilityIgnoresInvertColors />
-      ) : null}
-      <View style={styles.cardBody}>
-        <View style={styles.cardTop}>
-          <Text style={styles.time}>{time}</Text>
-          <View style={[styles.badge, { backgroundColor: color + '22' }]}>
-            <Text style={[styles.badgeText, { color }]}>{label}</Text>
-          </View>
-        </View>
-        <Text style={styles.medicineName}>{dose.medicineName}</Text>
-        {dose.dosage ? <Text style={styles.dosage}>{dose.dosage}</Text> : null}
+      <View style={[styles.cardBar, { backgroundColor: color }]} />
+      <View style={[styles.cardImageBox, { backgroundColor: color + '28' }]}>
+        {dose.medicinePhotoUri ? (
+          <Image
+            source={{ uri: dose.medicinePhotoUri }}
+            style={styles.cardImage}
+            accessibilityIgnoresInvertColors
+          />
+        ) : (
+          <Ionicons name="medical" size={26} color={color} />
+        )}
       </View>
-      {state !== 'taken' && (
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.checkBtn}
-            onPress={() => onCheck(dose.id)}
-            accessibilityLabel={`Marcar ${dose.medicineName} como tomado`}
-            accessibilityRole="button"
-          >
-            <Ionicons name="checkmark" size={22} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.skipBtn}
-            onPress={() => onSkip(dose.id)}
-            accessibilityLabel={`Pular dose de ${dose.medicineName}`}
-            accessibilityRole="button"
-          >
-            <Ionicons name="close" size={18} color={C.sub} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.editBtn}
-            onPress={() => onEdit(dose.id)}
-            accessibilityLabel="Editar dose"
-            accessibilityRole="button"
-          >
-            <Ionicons name="pencil-outline" size={15} color={C.sub} />
-          </TouchableOpacity>
+      <View style={styles.cardInfo}>
+        <Text variant="title" style={{ fontSize: 15, color: C.primary }} numberOfLines={1}>
+          {dose.medicineName}
+        </Text>
+        {dose.dosage ? (
+          <Text variant="caption" style={{ color: C.sub }} numberOfLines={1}>
+            {dose.dosage}
+          </Text>
+        ) : null}
+        <View style={[styles.badge, { backgroundColor: color + '22' }]}>
+          <Text style={[styles.badgeText, { color }]}>{STATUS_LABEL[displayStatus]}</Text>
         </View>
+      </View>
+      {canToggle && (
+        <Switch
+          value={isTaken}
+          onValueChange={val => (val ? onTake(dose) : onUntake(dose))}
+          trackColor={{ false: C.border, true: color }}
+          thumbColor={C.card}
+          style={styles.switch}
+          accessibilityLabel={isTaken ? 'Marcar como não tomado' : 'Marcar como tomado'}
+        />
       )}
-      {state === 'taken' && (
-        <View style={styles.actions}>
-          <Ionicons name="checkmark-circle" size={26} color={C.success} accessibilityLabel="Tomado" />
-          <TouchableOpacity
-            style={styles.editBtn}
-            onPress={() => onEdit(dose.id)}
-            accessibilityLabel="Editar dose"
-            accessibilityRole="button"
-          >
-            <Ionicons name="pencil-outline" size={15} color={C.sub} />
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
+    </TouchableOpacity>
   );
 }
 
+// ─── DayCell ──────────────────────────────────────────────────────────────────
+
+function DayCell({
+  dateStr,
+  day,
+  dow,
+  isSelected,
+  isToday,
+  status,
+  onPress,
+  C,
+}: Readonly<{
+  dateStr: string;
+  day: number;
+  dow: number;
+  isSelected: boolean;
+  isToday: boolean;
+  status?: DayStatus;
+  onPress: (d: string) => void;
+  C: HomeColors;
+}>) {
+  const scale = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <TouchableOpacity
+      style={styles.dayCellFlex}
+      onPress={() => {
+        scale.value = withSequence(
+          withSpring(0.82, { duration: 80 }),
+          withSpring(1, { duration: 200 })
+        );
+        onPress(dateStr);
+      }}
+      activeOpacity={1}
+      accessibilityRole="button"
+      accessibilityLabel={`Dia ${day}`}
+      accessibilityState={{ selected: isSelected }}
+    >
+      <Animated.View
+        style={[
+          styles.dayCellInner,
+          isSelected && [
+            styles.dateCellSelected,
+            { backgroundColor: C.primary, shadowColor: C.primary },
+          ],
+          animStyle,
+        ]}
+      >
+        <Text style={[styles.dateDayNum, { color: isSelected ? C.card : C.primary }]}>
+          {String(day).padStart(2, '0')}
+        </Text>
+        <Text style={[styles.dateDow, { color: isSelected ? C.card + 'B8' : C.sub }]}>
+          {DAYS_SHORT[dow]}
+        </Text>
+        <View style={styles.dayCellDotRow}>
+          {isToday && !isSelected && (
+            <View style={[styles.todayDot, { backgroundColor: C.primary }]} />
+          )}
+          {status && (
+            <View style={[styles.statusDot, { backgroundColor: STATUS_DOT_COLOR[status] }]} />
+          )}
+        </View>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
+// ─── DashboardScreen ──────────────────────────────────────────────────────────
+
 export default function DashboardScreen() {
-  const [filter, setFilter] = useState<FilterTab>('upcoming');
-  const C = useTheme();
-  const styles = useMemo(() => makeStyles(C), [C]);
+  const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
+
+  const C = useHomeColors();
   const insets = useSafeAreaInsets();
-  const dbReady = useAppStore((s) => s.dbReady);
-  const selectedDate = useAppStore((s) => s.selectedDate);
-  const activeProfile = useAppStore((s) => s.activeProfile);
   const router = useRouter();
   const qc = useQueryClient();
 
-  const { data: doses = [], isLoading, refetch } = useQuery({
+  const dbReady = useAppStore(s => s.dbReady);
+  const selectedDate = useAppStore(s => s.selectedDate);
+  const setSelectedDate = useAppStore(s => s.setSelectedDate);
+  const activeProfile = useAppStore(s => s.activeProfile);
+
+  const todayStr = useMemo(() => toLocalDateStr(new Date()), []);
+  const [weekAnchor, setWeekAnchor] = useState(() => getSundayOf(selectedDate));
+  const weekDays = useMemo(() => buildWeekFromAnchor(weekAnchor), [weekAnchor]);
+  const weekEnd = useMemo(() => weekDays[6]?.dateStr ?? weekAnchor, [weekDays, weekAnchor]);
+  const selectedDateObj = useMemo(() => new Date(selectedDate + 'T12:00:00'), [selectedDate]);
+
+  const {
+    data: doses = [],
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ['doses', selectedDate],
     queryFn: () => getDosesForDate(selectedDate),
     enabled: dbReady,
   });
 
+  const { data: weekDoses = [] } = useQuery({
+    queryKey: ['week-doses', weekAnchor],
+    queryFn: () => getDosesForDateRange(weekAnchor, weekEnd),
+    enabled: dbReady,
+  });
+
+  const dayStatusMap = useMemo<Record<string, DayStatus>>(() => {
+    const byDate = weekDoses.reduce<Record<string, Dose[]>>((acc, dose) => {
+      const date = dose.scheduledTime.slice(0, 10);
+      if (!acc[date]) {
+        acc[date] = [];
+      }
+      acc[date].push(dose);
+      return acc;
+    }, {});
+    const result: Record<string, DayStatus> = {};
+    for (const [date, dosesOnDay] of Object.entries(byDate)) {
+      const statuses = dosesOnDay.map(d => getDisplayStatus(d));
+      if (statuses.includes('late')) result[date] = 'has_late';
+      else if (statuses.every(s => s === 'taken')) result[date] = 'all_taken';
+      else result[date] = 'has_pending';
+    }
+    return result;
+  }, [weekDoses]);
+
+  function goToPrevWeek() {
+    const d = new Date(weekAnchor + 'T12:00:00');
+    d.setDate(d.getDate() - 7);
+    const newAnchor = toLocalDateStr(d);
+    setWeekAnchor(newAnchor);
+    const selDow = new Date(selectedDate + 'T12:00:00').getDay();
+    const newSel = new Date(d);
+    newSel.setDate(d.getDate() + selDow);
+    setSelectedDate(toLocalDateStr(newSel));
+    haptic.light();
+  }
+
+  function goToNextWeek() {
+    const d = new Date(weekAnchor + 'T12:00:00');
+    d.setDate(d.getDate() + 7);
+    const newAnchor = toLocalDateStr(d);
+    setWeekAnchor(newAnchor);
+    const selDow = new Date(selectedDate + 'T12:00:00').getDay();
+    const newSel = new Date(d);
+    newSel.setDate(d.getDate() + selDow);
+    setSelectedDate(toLocalDateStr(newSel));
+    haptic.light();
+  }
+
+  function goToToday() {
+    setWeekAnchor(getSundayOf(todayStr));
+    setSelectedDate(todayStr);
+    haptic.medium();
+  }
+
   const takeMutation = useMutation({
-    mutationFn: (id: number) =>
-      updateDoseStatus(id, 'taken', new Date().toISOString()),
+    mutationFn: (id: number) => updateDoseStatus(id, 'taken', new Date().toISOString()),
     onSuccess: () => {
       haptic.success();
       syncToCloud().catch(console.error);
@@ -150,223 +392,518 @@ export default function DashboardScreen() {
     },
   });
 
-  const skipMutation = useMutation({
-    mutationFn: (id: number) => updateDoseStatus(id, 'skipped'),
-    onSuccess: (_, id) => {
+  const undoneMutation = useMutation({
+    mutationFn: (id: number) => updateDoseStatus(id, 'pending'),
+    onSuccess: () => {
       haptic.warning();
       syncToCloud().catch(console.error);
-      const dose = doses.find((d) => d.id === id);
-      if (dose) notifyMissedDose({ name: dose.medicineName ?? '', dosage: dose.dosage }).catch(console.error);
       qc.invalidateQueries({ queryKey: ['doses'] });
     },
   });
 
-  const filtered = doses.filter((d) => {
-    const state = getDoseState(d);
-    if (filter === 'taken') return d.status === 'taken';
-    if (filter === 'late') return state === 'late';
-    return state === 'upcoming' || state === 'snoozed';
-  });
+  function markTaken(dose: Dose) {
+    takeMutation.mutate(dose.id);
+  }
+  function markUndone(dose: Dose) {
+    undoneMutation.mutate(dose.id);
+  }
 
-  const counts = {
-    upcoming: doses.filter((d) => { const s = getDoseState(d); return s === 'upcoming' || s === 'snoozed'; }).length,
-    taken: doses.filter((d) => d.status === 'taken').length,
-    late: doses.filter((d) => getDoseState(d) === 'late').length,
-  };
+  const filteredDoses = useMemo(() => {
+    let result = doses;
+    if (search.trim()) {
+      result = result.filter(d => d.medicineName?.toLowerCase().includes(search.toLowerCase()));
+    }
+    if (activeFilter === 'taken') {
+      result = result.filter(d => getDisplayStatus(d) === 'taken');
+    } else if (activeFilter === 'pending') {
+      result = result.filter(d => {
+        const s = getDisplayStatus(d);
+        return s === 'pending' || s === 'snoozed';
+      });
+    } else if (activeFilter === 'late') {
+      result = result.filter(d => getDisplayStatus(d) === 'late');
+    }
+    return result;
+  }, [doses, search, activeFilter]);
 
-  const today = new Date();
-  const dateLabel = today.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
-
-  const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<Dose>) => (
-      <DoseCard
-        dose={item}
-        onCheck={(id) => takeMutation.mutate(id)}
-        onSkip={(id) => skipMutation.mutate(id)}
-        onEdit={(id) => router.push(`/edit-dose?id=${id}` as never)}
-      />
-    ),
-    [takeMutation, skipMutation, router]
+  const filterCounts = useMemo(
+    () => ({
+      all: doses.length,
+      taken: doses.filter(d => getDisplayStatus(d) === 'taken').length,
+      pending: doses.filter(d => {
+        const s = getDisplayStatus(d);
+        return s === 'pending' || s === 'snoozed';
+      }).length,
+      late: doses.filter(d => getDisplayStatus(d) === 'late').length,
+    }),
+    [doses]
   );
 
+  const monthLabel = `${MONTHS_PT[selectedDateObj.getMonth()]} ${selectedDateObj.getFullYear()}`;
+  const dateLabel = selectedDateObj.toLocaleDateString('pt-BR', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'long',
+  });
+  const greeting = activeProfile?.name ? `Olá, ${activeProfile.name.split(' ')[0]}!` : 'Olá!';
+
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Hoje</Text>
-          <Text style={styles.headerDate}>{dateLabel}</Text>
-          {activeProfile ? (
-            <TouchableOpacity onPress={() => router.push('/profiles' as never)} style={styles.profileChip}>
-              <Ionicons name="people-outline" size={13} color="rgba(255,255,255,0.8)" />
-              <Text style={styles.profileChipText}>{activeProfile.name}</Text>
-            </TouchableOpacity>
-          ) : null}
+    <View style={[styles.container, { backgroundColor: C.bg, paddingTop: insets.top }]}>
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <View style={styles.header}>
+        <View style={styles.logoRow}>
+          <View style={[styles.logoIcon, { backgroundColor: C.primary }]}>
+            <Ionicons name="medical" size={16} color={C.card} />
+          </View>
+          <Text style={[styles.logoText, { color: C.primary }]}>Doser</Text>
         </View>
         <View style={styles.headerRight}>
-          {doses.length > 0 && (
-            <View style={styles.progressBox}>
-              <Text style={styles.progressLabel}>
-                {counts.taken}/{doses.length}
-              </Text>
-              <Text style={styles.progressSub}>doses</Text>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${Math.round((counts.taken / doses.length) * 100)}%` as unknown as number }]} />
+          <TouchableOpacity
+            style={[styles.iconBtn, { backgroundColor: C.card, shadowColor: C.primary }]}
+            onPress={() => router.push('/scan-prescription')}
+            accessibilityLabel="Escanear receita"
+            accessibilityRole="button"
+          >
+            <Ionicons name="scan-outline" size={20} color={C.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.avatarBtn}
+            onPress={() => router.push('/profiles')}
+            accessibilityLabel="Perfis"
+            accessibilityRole="button"
+          >
+            {activeProfile ? (
+              <View style={[styles.avatarInner, { backgroundColor: activeProfile.color + '33' }]}>
+                <Text style={[styles.avatarInitial, { color: activeProfile.color }]}>
+                  {activeProfile.name[0]?.toUpperCase()}
+                </Text>
+              </View>
+            ) : (
+              <View style={[styles.avatarInner, { backgroundColor: C.primary + '22' }]}>
+                <Ionicons name="person" size={18} color={C.primary} />
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* ── Greeting (fixo) ────────────────────────────────────────────── */}
+      <View style={styles.greetingSection}>
+        <Text style={[styles.dateSmall, { color: C.sub }]}>{dateLabel}</Text>
+        <Text style={[styles.greetingText, { color: C.primary }]}>{greeting}</Text>
+      </View>
+
+      {/* ── Search (fixo) ──────────────────────────────────────────────── */}
+      <View style={[styles.searchWrap, { backgroundColor: C.card, shadowColor: C.primary }]}>
+        <Ionicons name="search-outline" size={17} color={C.sub} />
+        <TextInput
+          style={[styles.searchInput, { color: C.primary }]}
+          placeholder="Buscar medicamento..."
+          placeholderTextColor={C.sub}
+          value={search}
+          onChangeText={setSearch}
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')} accessibilityLabel="Limpar busca">
+            <Ionicons name="close-circle" size={17} color={C.sub} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* ── Month nav ──────────────────────────────────────────────────── */}
+      <View style={styles.monthRow}>
+        <View style={styles.monthNav}>
+          <TouchableOpacity
+            style={styles.weekNavBtn}
+            onPress={goToPrevWeek}
+            accessibilityLabel="Semana anterior"
+            accessibilityRole="button"
+          >
+            <Ionicons name="chevron-back" size={16} color={C.primary} />
+          </TouchableOpacity>
+          <Text style={[styles.monthText, { color: C.primary }]}>{monthLabel}</Text>
+          <TouchableOpacity
+            style={styles.weekNavBtn}
+            onPress={goToNextWeek}
+            accessibilityLabel="Próxima semana"
+            accessibilityRole="button"
+          >
+            <Ionicons name="chevron-forward" size={16} color={C.primary} />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.monthRight}>
+          {selectedDate !== todayStr && (
+            <TouchableOpacity
+              style={[styles.todayBtn, { borderColor: C.primary }]}
+              onPress={goToToday}
+              accessibilityLabel="Ir para hoje"
+              accessibilityRole="button"
+            >
+              <Text style={[styles.todayBtnText, { color: C.primary }]}>Hoje</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[styles.addMedBtn, { backgroundColor: C.primary }]}
+            onPress={() => router.push('/add-medicine')}
+            accessibilityLabel="Adicionar medicamento"
+            accessibilityRole="button"
+          >
+            <Ionicons name="add" size={16} color={C.card} />
+            <Text style={[styles.addMedText, { color: C.card }]}>Adicionar</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* ── Date strip ─────────────────────────────────────────────────── */}
+      <View style={styles.dateStripWrapper}>
+        {weekDays.map(({ dateStr, day, dow }) => (
+          <DayCell
+            key={dateStr}
+            dateStr={dateStr}
+            day={day}
+            dow={dow}
+            isSelected={dateStr === selectedDate}
+            isToday={dateStr === todayStr}
+            status={dayStatusMap[dateStr]}
+            onPress={setSelectedDate}
+            C={C}
+          />
+        ))}
+      </View>
+
+      {/* ── Filter chips (fixo, scroll horizontal) ─────────────────────── */}
+      <View style={styles.filterStripWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterStrip}
+        >
+          {FILTERS.map(({ key, label }) => {
+            const active = activeFilter === key;
+            const count = filterCounts[key];
+            return (
+              <TouchableOpacity
+                key={key}
+                style={[
+                  styles.filterChip,
+                  {
+                    backgroundColor: active ? C.primary : C.card,
+                    shadowColor: C.primary,
+                  },
+                ]}
+                onPress={() => setActiveFilter(key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+              >
+                <Text style={[styles.filterChipText, { color: active ? C.card : C.sub }]}>
+                  {label}
+                </Text>
+                {count > 0 && (
+                  <View
+                    style={[
+                      styles.filterBadge,
+                      {
+                        backgroundColor: active ? C.card + '33' : C.primary + '18',
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.filterBadgeText, { color: active ? C.card : C.primary }]}>
+                      {count}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* ── Timeline (único trecho que faz scroll) ─────────────────────── */}
+      <ScrollView
+        style={styles.timelineScroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={refetch}
+            colors={[C.primary]}
+            tintColor={C.primary}
+          />
+        }
+        contentContainerStyle={styles.timelineContent}
+      >
+        {!isLoading && filteredDoses.length === 0 && (
+          <View style={styles.empty}>
+            <Ionicons name="checkmark-circle-outline" size={52} color={C.border} />
+            <Text style={[styles.emptyTitle, { color: C.sub }]}>
+              {search ? 'Nenhum resultado' : 'Sem doses para este dia'}
+            </Text>
+            {!search && (
+              <TouchableOpacity
+                style={[styles.emptyAddBtn, { backgroundColor: C.primary }]}
+                onPress={() => router.push('/add-medicine')}
+              >
+                <Text style={[styles.emptyAddText, { color: C.card }]}>Adicionar medicamento</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        {filteredDoses.map((dose, index) => {
+          const isLast = index === filteredDoses.length - 1;
+          const dotColor = STATUS_COLOR[getDisplayStatus(dose)];
+          const time = formatTime(dose.scheduledTime);
+          return (
+            <View key={dose.id} style={styles.timelineRow}>
+              {/* Left: time + dot + line */}
+              <View style={styles.timelineLeft}>
+                <Text style={[styles.timeLabel, { color: C.sub }]}>{time}</Text>
+                <View style={styles.dotCol}>
+                  <View style={[styles.dot, { backgroundColor: dotColor }]} />
+                  {!isLast && <View style={[styles.line, { backgroundColor: C.border }]} />}
+                </View>
+              </View>
+              {/* Right: dose card */}
+              <View style={styles.timelineRight}>
+                <DoseCard
+                  dose={dose}
+                  onTake={markTaken}
+                  onUntake={markUndone}
+                  onPress={id => router.push(`/edit-dose?id=${id}`)}
+                />
               </View>
             </View>
-          )}
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.scanBtn} onPress={() => router.push('/scan-prescription' as never)}>
-              <Ionicons name="scan-outline" size={20} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/add-medicine' as never)}>
-              <Ionicons name="add" size={24} color={C.primary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.filterRow}>
-        {(['upcoming', 'taken', 'late'] as FilterTab[]).map((tab) => {
-          const labels: Record<FilterTab, string> = { upcoming: 'Próximos', taken: 'Tomados', late: 'Atrasados' };
-          const active = filter === tab;
-          return (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.filterTab, active && styles.filterTabActive]}
-              onPress={() => setFilter(tab)}
-            >
-              <Text style={[styles.filterText, active && styles.filterTextActive]}>
-                {labels[tab]} {counts[tab] > 0 ? `(${counts[tab]})` : ''}
-              </Text>
-            </TouchableOpacity>
           );
         })}
-      </View>
-
-      <AdherenceWidget />
-
-      {isLoading && (
-        <View style={[styles.list, { gap: 10 }]}>
-          {[1, 2, 3].map((k) => <DoseCardSkeleton key={k} />)}
-        </View>
-      )}
-      {!isLoading && filtered.length === 0 && (
-        <View style={styles.empty}>
-          <Ionicons name="checkmark-circle-outline" size={56} color={C.border} />
-          <Text style={styles.emptyText}>Nenhuma dose para hoje</Text>
-          <View style={styles.emptyActions}>
-            <TouchableOpacity style={styles.emptyActionCard} onPress={() => router.push('/scan-prescription' as never)}>
-              <Ionicons name="scan-outline" size={28} color={C.primary} />
-              <Text style={styles.emptyActionTitle}>Escanear Receita</Text>
-              <Text style={styles.emptyActionSub}>Fotografe e cadastre{'\n'}medicamentos automaticamente</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.emptyActionCard} onPress={() => router.push('/add-medicine' as never)}>
-              <Ionicons name="add-circle-outline" size={28} color={C.primary} />
-              <Text style={styles.emptyActionTitle}>Adicionar Manual</Text>
-              <Text style={styles.emptyActionSub}>Digite os dados do{'\n'}medicamento manualmente</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-      {!isLoading && filtered.length > 0 && (
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderItem}
-          contentContainerStyle={styles.list}
-          refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} colors={[C.primary]} />}
-        />
-      )}
+      </ScrollView>
     </View>
   );
 }
 
-function makeStyles(C: ThemeColors) {
-  return StyleSheet.create({
-    container: { flex: 1, backgroundColor: C.bg },
-    header: {
-      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
-      backgroundColor: C.primary, paddingHorizontal: 20, paddingBottom: 20,
-    },
-    headerLeft: { flex: 1 },
-    headerRight: { alignItems: 'flex-end', gap: 10 },
-    headerTitle: { fontSize: 28, fontWeight: '800', color: '#fff' },
-    headerDate: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 2, textTransform: 'capitalize' },
-    profileChip: {
-      marginTop: 10, alignSelf: 'flex-start',
-      flexDirection: 'row', alignItems: 'center', gap: 6,
-      paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
-      backgroundColor: 'rgba(255,255,255,0.18)',
-    },
-    profileChipText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-    progressBox: { alignItems: 'flex-end', gap: 2 },
-    progressLabel: { fontSize: 20, fontWeight: '800', color: '#fff', lineHeight: 22 },
-    progressSub: { fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: -2 },
-    progressTrack: {
-      width: 56, height: 4, borderRadius: 2,
-      backgroundColor: 'rgba(255,255,255,0.25)', overflow: 'hidden',
-    },
-    progressFill: { height: 4, borderRadius: 2, backgroundColor: '#fff' },
-    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    scanBtn: {
-      width: 42, height: 42, borderRadius: 21,
-      alignItems: 'center', justifyContent: 'center',
-      backgroundColor: 'rgba(255,255,255,0.18)',
-    },
-    addBtn: {
-      backgroundColor: '#fff', width: 42, height: 42,
-      borderRadius: 21, alignItems: 'center', justifyContent: 'center',
-    },
-    filterRow: {
-      flexDirection: 'row', backgroundColor: C.primary,
-      paddingHorizontal: 16, paddingBottom: 14, paddingTop: 0, gap: 8,
-    },
-    filterTab: {
-      flex: 1, paddingVertical: 7, borderRadius: 20,
-      alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)',
-    },
-    filterTabActive: { backgroundColor: '#fff' },
-    filterText: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
-    filterTextActive: { color: C.primary, fontWeight: '700' },
-    list: { padding: 16, gap: 10 },
-    loader: { flex: 1 },
-    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 20 },
-    emptyText: { fontSize: 16, color: C.sub },
-    emptyActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
-    emptyActionCard: {
-      flex: 1, backgroundColor: C.card, borderRadius: 16, padding: 16,
-      alignItems: 'center', gap: 8,
-      borderWidth: StyleSheet.hairlineWidth, borderColor: C.border,
-    },
-    emptyActionTitle: { fontSize: 14, fontWeight: '700', color: C.text, textAlign: 'center' },
-    emptyActionSub: { fontSize: 11, color: C.sub, textAlign: 'center', lineHeight: 16 },
-    card: {
-      flexDirection: 'row', backgroundColor: C.card, borderRadius: 14,
-      overflow: 'hidden', elevation: 2, shadowColor: '#000',
-      shadowOpacity: 0.07, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
-    },
-    cardDone: { opacity: 0.65 },
-    timeBar: { width: 4 },
-    photo: { width: 44, height: 44, borderRadius: 8, alignSelf: 'center', marginLeft: 10 },
-    cardBody: { flex: 1, padding: 14 },
-    cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-    time: { fontSize: 13, color: C.sub, fontWeight: '600' },
-    badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
-    badgeText: { fontSize: 11, fontWeight: '600' },
-    medicineName: { fontSize: 16, fontWeight: '700', color: C.text },
-    dosage: { fontSize: 13, color: C.sub, marginTop: 2 },
-    actions: { flexDirection: 'row', alignItems: 'center', paddingRight: 12, gap: 6 },
-    checkBtn: {
-      backgroundColor: C.success, width: 38, height: 38,
-      borderRadius: 19, alignItems: 'center', justifyContent: 'center',
-    },
-    skipBtn: {
-      width: 32, height: 32, borderRadius: 16, borderWidth: 1,
-      borderColor: C.border, alignItems: 'center', justifyContent: 'center',
-    },
-    editBtn: {
-      width: 28, height: 28, borderRadius: 14,
-      alignItems: 'center', justifyContent: 'center',
-    },
-  });
-}
+// ─── Styles (layout only — colors applied inline via theme) ───────────────────
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  timelineScroll: { flex: 1 },
+  timelineContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 110 },
+
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  logoIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoText: { fontSize: 18, fontWeight: '800' },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  iconBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  avatarBtn: {},
+  avatarInner: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: { fontSize: 17, fontWeight: '800' },
+
+  // Greeting
+  greetingSection: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: 10 },
+  dateSmall: { fontSize: 13, fontWeight: '500', textTransform: 'capitalize' },
+  greetingText: { fontSize: 30, fontWeight: '800', marginTop: 2 },
+
+  // Search
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 20,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    height: 50,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  searchInput: { flex: 1, fontSize: 15 },
+
+  // Month nav
+  monthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  monthNav: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  monthRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  monthText: { fontSize: 16, fontWeight: '700' },
+  weekNavBtn: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  todayBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1.5,
+  },
+  todayBtnText: { fontSize: 12, fontWeight: '700' },
+  addMedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 20,
+  },
+  addMedText: { fontSize: 13, fontWeight: '700' },
+
+  // Date strip
+  dateStripWrapper: {
+    flexDirection: 'row',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginBottom: 4,
+  },
+  dayCellFlex: { flex: 1, alignItems: 'center' },
+  dayCellInner: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 18,
+    gap: 2,
+    width: '100%',
+  },
+  dateCellSelected: {
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  dateDayNum: { fontSize: 15, fontWeight: '700' },
+  dateDow: { fontSize: 10, fontWeight: '600' },
+  dayCellDotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    height: 7,
+    marginTop: 2,
+  },
+  todayDot: { width: 5, height: 5, borderRadius: 3 },
+  statusDot: { width: 5, height: 5, borderRadius: 3 },
+
+  // Filter chips
+  filterStripWrapper: { height: 44, marginTop: 6, overflow: 'hidden' },
+  filterStrip: {
+    alignItems: 'flex-start',
+    paddingHorizontal: 20,
+    paddingVertical: 5,
+    gap: 8,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  filterChipText: { fontSize: 13, fontWeight: '600' },
+  filterBadge: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  filterBadgeText: { fontSize: 10, fontWeight: '700' },
+
+  // Timeline
+  timelineRow: { flexDirection: 'row' },
+  timelineLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingTop: 12,
+  },
+  timeLabel: { fontSize: 11, fontWeight: '600', width: 50, textAlign: 'right' },
+  dotCol: { alignItems: 'center', marginHorizontal: 10, flex: 1 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  line: { width: 1.5, flex: 1, marginTop: 4 },
+  timelineRight: { flex: 1 },
+
+  // Dose card
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    overflow: 'hidden',
+    marginBottom: 8,
+    minHeight: 76,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  cardDone: { opacity: 0.65 },
+  cardBar: { width: 5, alignSelf: 'stretch' },
+  cardImageBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    margin: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardImage: { width: 52, height: 52, borderRadius: 12 },
+  cardInfo: { flex: 1, paddingVertical: 10, paddingRight: 4, gap: 3 },
+  badge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginTop: 2,
+  },
+  badgeText: { fontSize: 11, fontWeight: '700' },
+  switch: { marginRight: 14 },
+
+  // Empty state
+  empty: { alignItems: 'center', paddingVertical: 44, gap: 12 },
+  emptyTitle: { fontSize: 14, fontWeight: '600' },
+  emptyAddBtn: {
+    paddingHorizontal: 24,
+    paddingVertical: 11,
+    borderRadius: 20,
+    marginTop: 4,
+  },
+  emptyAddText: { fontWeight: '700', fontSize: 14 },
+});

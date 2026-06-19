@@ -1,16 +1,16 @@
-import { useState, useMemo } from 'react';
-import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform,
-} from 'react-native';
+import { useState } from 'react';
+import { View, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { signInWithOtp } from '@/lib/auth';
-import { useTheme, type ThemeColors } from '@/hooks/use-theme';
+import { useTheme } from '@/hooks/use-theme';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Text } from '@/components/ui/Text';
 
 export default function AuthScreen() {
   const C = useTheme();
-  const styles = useMemo(() => makeStyles(C), [C]);
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -37,48 +37,53 @@ export default function AuthScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.root, { paddingTop: insets.top }]}
+      style={[styles.root, { backgroundColor: C.bg, paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.inner}>
         <Ionicons name="medical" size={52} color={C.primary} style={styles.icon} />
-        <Text style={styles.title}>Doser</Text>
-        <Text style={styles.subtitle}>Sincronize seus dados entre dispositivos.</Text>
+        <Text variant="heading" style={styles.title}>
+          Doser
+        </Text>
+        <Text variant="body" color={C.sub} style={styles.subtitle}>
+          Sincronize seus dados entre dispositivos.
+        </Text>
 
         {sent ? (
-          <View style={styles.sentCard}>
+          <Card variant="outlined" style={styles.sentCard}>
             <Ionicons name="mail-outline" size={36} color={C.success} />
-            <Text style={styles.sentTitle}>Link enviado!</Text>
-            <Text style={styles.sentBody}>
-              Abra o e-mail em <Text style={{ fontWeight: '700' }}>{email.trim()}</Text> e toque
-              no link para entrar.
+            <Text variant="title">Link enviado!</Text>
+            <Text variant="body" color={C.sub} style={styles.sentBody}>
+              Abra o e-mail em{' '}
+              <Text variant="body" style={{ fontWeight: '700' }}>
+                {email.trim()}
+              </Text>{' '}
+              e toque no link para entrar.
             </Text>
-          </View>
+          </Card>
         ) : (
           <>
-            <TextInput
-              style={styles.input}
+            <Input
               placeholder="seu@email.com"
-              placeholderTextColor={C.sub}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
               editable={!loading}
+              error={error ?? undefined}
+              style={styles.inputText}
             />
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-            <TouchableOpacity
-              style={[styles.btn, loading && styles.btnDisabled]}
+            <Button
+              variant="primary"
+              size="lg"
+              loading={loading}
               onPress={handleSend}
-              disabled={loading}
+              style={styles.btn}
+              accessibilityLabel="Enviar link mágico"
             >
-              {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.btnText}>Enviar link mágico</Text>
-              )}
-            </TouchableOpacity>
+              Enviar link mágico
+            </Button>
           </>
         )}
       </View>
@@ -86,35 +91,20 @@ export default function AuthScreen() {
   );
 }
 
-function makeStyles(C: ThemeColors) {
-  return StyleSheet.create({
-    root: { flex: 1, backgroundColor: C.bg },
-    inner: {
-      flex: 1, alignItems: 'center', justifyContent: 'center',
-      paddingHorizontal: 28, gap: 14,
-    },
-    icon: { marginBottom: 4 },
-    title: { fontSize: 32, fontWeight: '800', color: C.text },
-    subtitle: { fontSize: 15, color: C.sub, textAlign: 'center', marginBottom: 12 },
-    input: {
-      width: '100%', height: 52, borderRadius: 14,
-      borderWidth: StyleSheet.hairlineWidth, borderColor: C.border,
-      backgroundColor: C.card, paddingHorizontal: 16,
-      color: C.text, fontSize: 16,
-    },
-    error: { color: C.danger, fontSize: 13, alignSelf: 'flex-start' },
-    btn: {
-      width: '100%', height: 52, borderRadius: 14,
-      backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center',
-    },
-    btnDisabled: { opacity: 0.6 },
-    btnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-    sentCard: {
-      alignItems: 'center', gap: 12, padding: 24,
-      backgroundColor: C.card, borderRadius: 20,
-      borderWidth: StyleSheet.hairlineWidth, borderColor: C.border,
-    },
-    sentTitle: { fontSize: 20, fontWeight: '700', color: C.text },
-    sentBody: { fontSize: 14, color: C.sub, textAlign: 'center', lineHeight: 22 },
-  });
-}
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  inner: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    gap: 14,
+  },
+  icon: { marginBottom: 4 },
+  title: { fontSize: 32, fontWeight: '800' },
+  subtitle: { textAlign: 'center', marginBottom: 12 },
+  inputText: { width: '100%' },
+  btn: { width: '100%' },
+  sentCard: { alignItems: 'center', gap: 12 },
+  sentBody: { textAlign: 'center', lineHeight: 22 },
+});

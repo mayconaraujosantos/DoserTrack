@@ -1,4 +1,3 @@
-import * as SQLite from 'expo-sqlite';
 import type {
   Dose,
   DoseStatus,
@@ -8,6 +7,7 @@ import type {
   Profile,
   Schedule,
 } from '@/types';
+import * as SQLite from 'expo-sqlite';
 
 let db: SQLite.SQLiteDatabase;
 let activeProfileId: number | null = null;
@@ -21,7 +21,7 @@ function requireActiveProfileId(): number {
 
 async function tableHasColumn(table: string, column: string): Promise<boolean> {
   const rows = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
-  return rows.some((row) => row.name === column);
+  return rows.some(row => row.name === column);
 }
 
 async function ensureColumn(table: string, column: string, definition: string): Promise<void> {
@@ -109,14 +109,23 @@ export async function initDatabase() {
 
   const defaultProfile = await ensureDefaultProfile();
 
-  await db.runAsync('UPDATE medicines SET profile_id = ? WHERE profile_id IS NULL OR profile_id = 0', [defaultProfile.id]);
-  await db.runAsync('UPDATE schedules SET profile_id = ? WHERE profile_id IS NULL OR profile_id = 0', [defaultProfile.id]);
-  await db.runAsync('UPDATE doses SET profile_id = ? WHERE profile_id IS NULL OR profile_id = 0', [defaultProfile.id]);
+  await db.runAsync(
+    'UPDATE medicines SET profile_id = ? WHERE profile_id IS NULL OR profile_id = 0',
+    [defaultProfile.id]
+  );
+  await db.runAsync(
+    'UPDATE schedules SET profile_id = ? WHERE profile_id IS NULL OR profile_id = 0',
+    [defaultProfile.id]
+  );
+  await db.runAsync('UPDATE doses SET profile_id = ? WHERE profile_id IS NULL OR profile_id = 0', [
+    defaultProfile.id,
+  ]);
 
   await db.execAsync(`
     CREATE INDEX IF NOT EXISTS idx_medicines_profile_id ON medicines(profile_id);
     CREATE INDEX IF NOT EXISTS idx_schedules_profile_id ON schedules(profile_id);
     CREATE INDEX IF NOT EXISTS idx_doses_profile_id ON doses(profile_id);
+    CREATE INDEX IF NOT EXISTS idx_doses_scheduled_time ON doses(scheduled_time);
   `);
 }
 
@@ -192,7 +201,15 @@ export async function createMedicine(
   const result = await db.runAsync(
     `INSERT INTO medicines (profile_id, name, type, stock_quantity, stock_unit, photo_uri, low_stock_threshold)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [profileId, data.name, data.type, data.stockQuantity, data.stockUnit, data.photoUri ?? null, data.lowStockThreshold]
+    [
+      profileId,
+      data.name,
+      data.type,
+      data.stockQuantity,
+      data.stockUnit,
+      data.photoUri ?? null,
+      data.lowStockThreshold,
+    ]
   );
   return (await getMedicineById(result.lastInsertRowId))!;
 }
@@ -206,14 +223,27 @@ export async function updateMedicine(
     `UPDATE medicines
      SET name = ?, type = ?, stock_quantity = ?, stock_unit = ?, photo_uri = ?, low_stock_threshold = ?
      WHERE id = ? AND profile_id = ?`,
-    [data.name, data.type, data.stockQuantity, data.stockUnit, data.photoUri ?? null, data.lowStockThreshold, id, profileId]
+    [
+      data.name,
+      data.type,
+      data.stockQuantity,
+      data.stockUnit,
+      data.photoUri ?? null,
+      data.lowStockThreshold,
+      id,
+      profileId,
+    ]
   );
   return (await getMedicineById(id))!;
 }
 
 export async function updateMedicineStock(id: number, newQuantity: number) {
   const profileId = requireActiveProfileId();
-  await db.runAsync('UPDATE medicines SET stock_quantity = ? WHERE id = ? AND profile_id = ?', [newQuantity, id, profileId]);
+  await db.runAsync('UPDATE medicines SET stock_quantity = ? WHERE id = ? AND profile_id = ?', [
+    newQuantity,
+    id,
+    profileId,
+  ]);
 }
 
 export async function deleteMedicine(id: number) {
@@ -225,14 +255,17 @@ export async function deleteMedicine(id: number) {
 
 export async function getSchedules(): Promise<Schedule[]> {
   const profileId = requireActiveProfileId();
-  const rows = await db.getAllAsync<Record<string, unknown>>(`
+  const rows = await db.getAllAsync<Record<string, unknown>>(
+    `
     SELECT s.*, m.name as medicine_name
     FROM schedules s
     JOIN medicines m ON s.medicine_id = m.id
     WHERE s.profile_id = ?
       AND s.is_active = 1
     ORDER BY s.created_at DESC
-  `, [profileId]);
+  `,
+    [profileId]
+  );
   return rows.map(rowToSchedule);
 }
 
@@ -270,14 +303,18 @@ export async function createSchedule(
 
 export async function deactivateSchedule(id: number) {
   const profileId = requireActiveProfileId();
-  await db.runAsync('UPDATE schedules SET is_active = 0 WHERE id = ? AND profile_id = ?', [id, profileId]);
+  await db.runAsync('UPDATE schedules SET is_active = 0 WHERE id = ? AND profile_id = ?', [
+    id,
+    profileId,
+  ]);
 }
 
 // --- Doses ---
 
 export async function getDosesForDate(date: string): Promise<Dose[]> {
   const profileId = requireActiveProfileId();
-  const rows = await db.getAllAsync<Record<string, unknown>>(`
+  const rows = await db.getAllAsync<Record<string, unknown>>(
+    `
     SELECT d.*, m.name as medicine_name, m.type as medicine_type, m.photo_uri as medicine_photo_uri, s.dosage
     FROM doses d
     JOIN medicines m ON d.medicine_id = m.id
@@ -285,20 +322,25 @@ export async function getDosesForDate(date: string): Promise<Dose[]> {
     WHERE d.profile_id = ?
       AND date(d.scheduled_time) = ?
     ORDER BY d.scheduled_time ASC
-  `, [profileId, date]);
+  `,
+    [profileId, date]
+  );
   return rows.map(rowToDose);
 }
 
 export async function getDoseById(id: number): Promise<Dose | null> {
   const profileId = requireActiveProfileId();
-  const row = await db.getFirstAsync<Record<string, unknown>>(`
+  const row = await db.getFirstAsync<Record<string, unknown>>(
+    `
     SELECT d.*, m.name as medicine_name, m.type as medicine_type, m.photo_uri as medicine_photo_uri, s.dosage
     FROM doses d
     JOIN medicines m ON d.medicine_id = m.id
     JOIN schedules s ON d.schedule_id = s.id
     WHERE d.id = ?
       AND d.profile_id = ?
-  `, [id, profileId]);
+  `,
+    [id, profileId]
+  );
   return row ? rowToDose(row) : null;
 }
 
@@ -317,12 +359,34 @@ export async function updateDoseStatus(
 
 export async function updateDoseNotificationId(id: number, notificationId: string) {
   const profileId = requireActiveProfileId();
-  await db.runAsync('UPDATE doses SET notification_id = ? WHERE id = ? AND profile_id = ?', [notificationId, id, profileId]);
+  await db.runAsync('UPDATE doses SET notification_id = ? WHERE id = ? AND profile_id = ?', [
+    notificationId,
+    id,
+    profileId,
+  ]);
+}
+
+export async function getDatesWithDosesInMonth(year: number, month: number): Promise<Set<string>> {
+  const profileId = requireActiveProfileId();
+  const mm = String(month + 1).padStart(2, '0');
+  const startDate = `${year}-${mm}-01`;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const endDate = `${year}-${mm}-${String(lastDay).padStart(2, '0')}`;
+  const rows = await db.getAllAsync<{ date: string }>(
+    `SELECT DISTINCT substr(scheduled_time, 1, 10) as date
+     FROM doses
+     WHERE profile_id = ?
+       AND substr(scheduled_time, 1, 10) >= ?
+       AND substr(scheduled_time, 1, 10) <= ?`,
+    [profileId, startDate, endDate]
+  );
+  return new Set(rows.map(r => r.date));
 }
 
 export async function getDosesForDateRange(startDate: string, endDate: string): Promise<Dose[]> {
   const profileId = requireActiveProfileId();
-  const rows = await db.getAllAsync<Record<string, unknown>>(`
+  const rows = await db.getAllAsync<Record<string, unknown>>(
+    `
     SELECT d.*, m.name as medicine_name, m.type as medicine_type, m.photo_uri as medicine_photo_uri, s.dosage
     FROM doses d
     JOIN medicines m ON d.medicine_id = m.id
@@ -330,30 +394,16 @@ export async function getDosesForDateRange(startDate: string, endDate: string): 
     WHERE d.profile_id = ?
       AND date(d.scheduled_time) BETWEEN ? AND ?
     ORDER BY d.scheduled_time ASC
-  `, [profileId, startDate, endDate]);
+  `,
+    [profileId, startDate, endDate]
+  );
   return rows.map(rowToDose);
-}
-
-export async function getWeeklyAdherence(): Promise<{ date: string; taken: number; total: number }[]> {
-  const profileId = requireActiveProfileId();
-  const rows = await db.getAllAsync<{ date: string; taken: number; total: number }>(`
-    SELECT
-      date(scheduled_time) as date,
-      COUNT(*) as total,
-      SUM(CASE WHEN status = 'taken' THEN 1 ELSE 0 END) as taken
-    FROM doses
-    WHERE profile_id = ?
-      AND date(scheduled_time) >= date('now', '-6 days')
-      AND date(scheduled_time) <= date('now')
-    GROUP BY date(scheduled_time)
-    ORDER BY date ASC
-  `, [profileId]);
-  return rows;
 }
 
 export async function getPendingDosesWithoutNotification(): Promise<Dose[]> {
   const profileId = requireActiveProfileId();
-  const rows = await db.getAllAsync<Record<string, unknown>>(`
+  const rows = await db.getAllAsync<Record<string, unknown>>(
+    `
     SELECT d.*, m.name as medicine_name, m.type as medicine_type, m.photo_uri as medicine_photo_uri, s.dosage
     FROM doses d
     JOIN medicines m ON d.medicine_id = m.id
@@ -363,7 +413,9 @@ export async function getPendingDosesWithoutNotification(): Promise<Dose[]> {
       AND d.scheduled_time > datetime('now')
       AND (d.notification_id IS NULL OR d.notification_id = '')
     ORDER BY d.scheduled_time ASC
-  `, [profileId]);
+  `,
+    [profileId]
+  );
   return rows.map(rowToDose);
 }
 
@@ -376,7 +428,8 @@ export interface DayAdherence {
 
 export async function getWeekAdherence(): Promise<DayAdherence[]> {
   const profileId = requireActiveProfileId();
-  const rows = await db.getAllAsync<{ date: string; total: number; taken: number }>(`
+  const rows = await db.getAllAsync<{ date: string; total: number; taken: number }>(
+    `
     SELECT
       date(scheduled_time) as date,
       COUNT(*) as total,
@@ -387,13 +440,16 @@ export async function getWeekAdherence(): Promise<DayAdherence[]> {
       AND date(scheduled_time) <= date('now')
     GROUP BY date(scheduled_time)
     ORDER BY date ASC
-  `, [profileId]);
-  return rows.map((r) => ({ ...r, rate: r.total > 0 ? r.taken / r.total : 0 }));
+  `,
+    [profileId]
+  );
+  return rows.map(r => ({ ...r, rate: r.total > 0 ? r.taken / r.total : 0 }));
 }
 
 export async function getAdherenceStreak(): Promise<number> {
   const profileId = requireActiveProfileId();
-  const rows = await db.getAllAsync<{ date: string; total: number; taken: number }>(`
+  const rows = await db.getAllAsync<{ date: string; total: number; taken: number }>(
+    `
     SELECT
       date(scheduled_time) as date,
       COUNT(*) as total,
@@ -405,7 +461,9 @@ export async function getAdherenceStreak(): Promise<number> {
     GROUP BY date(scheduled_time)
     ORDER BY date DESC
     LIMIT 90
-  `, [profileId]);
+  `,
+    [profileId]
+  );
 
   let streak = 0;
   const today = new Date();
@@ -423,7 +481,8 @@ export async function getAdherenceStreak(): Promise<number> {
 
 export async function getRecentHistory(limit = 50): Promise<Dose[]> {
   const profileId = requireActiveProfileId();
-  const rows = await db.getAllAsync<Record<string, unknown>>(`
+  const rows = await db.getAllAsync<Record<string, unknown>>(
+    `
     SELECT d.*, m.name as medicine_name, m.type as medicine_type, m.photo_uri as medicine_photo_uri, s.dosage
     FROM doses d
     JOIN medicines m ON d.medicine_id = m.id
@@ -433,90 +492,205 @@ export async function getRecentHistory(limit = 50): Promise<Dose[]> {
       AND date(d.scheduled_time) <= date('now')
     ORDER BY d.scheduled_time DESC
     LIMIT ?
-  `, [profileId, limit]);
+  `,
+    [profileId, limit]
+  );
   return rows.map(rowToDose);
 }
 
 // --- Dose Generation ---
 
+function buildIntervalDates(config: FrequencyConfig, genStart: Date, finalEnd: Date): Date[] {
+  if (!config.intervalHours) return [];
+  const intervalMs = config.intervalHours * 3_600_000;
+  const [h, m] = config.times[0].split(':').map(Number);
+  let current = new Date(genStart);
+  current.setHours(h, m, 0, 0);
+  if (current < genStart) {
+    const elapsed = Math.ceil((genStart.getTime() - current.getTime()) / intervalMs);
+    current = new Date(current.getTime() + elapsed * intervalMs);
+  }
+  const dates: Date[] = [];
+  while (current <= finalEnd) {
+    dates.push(new Date(current));
+    current = new Date(current.getTime() + intervalMs);
+  }
+  return dates;
+}
+
+function buildSpecificDaysDates(config: FrequencyConfig, genStart: Date, finalEnd: Date): Date[] {
+  if (!config.specificDays) return [];
+  const dates: Date[] = [];
+  let current = new Date(genStart);
+  current.setHours(0, 0, 0, 0);
+  while (current <= finalEnd) {
+    if (config.specificDays.includes(current.getDay())) {
+      for (const time of config.times) {
+        const [h, m] = time.split(':').map(Number);
+        const d = new Date(current);
+        d.setHours(h, m, 0, 0);
+        if (d >= genStart) dates.push(d);
+      }
+    }
+    current.setDate(current.getDate() + 1);
+  }
+  return dates;
+}
+
+function buildFixedCycleDates(
+  config: FrequencyConfig,
+  genStart: Date,
+  finalEnd: Date,
+  startDate: Date
+): Date[] {
+  if (!config.daysOn || !config.daysOff) return [];
+  const cycleLen = config.daysOn + config.daysOff;
+  const msPerDay = 24 * 3_600_000;
+  const daysSinceStart = Math.floor((genStart.getTime() - startDate.getTime()) / msPerDay);
+  let current = new Date(genStart);
+  current.setHours(0, 0, 0, 0);
+  let dayIndex = daysSinceStart;
+  const dates: Date[] = [];
+  while (current <= finalEnd) {
+    const posInCycle = ((dayIndex % cycleLen) + cycleLen) % cycleLen;
+    if (posInCycle < config.daysOn) {
+      for (const time of config.times) {
+        const [h, m] = time.split(':').map(Number);
+        const d = new Date(current);
+        d.setHours(h, m, 0, 0);
+        if (d >= genStart) dates.push(d);
+      }
+    }
+    current.setDate(current.getDate() + 1);
+    dayIndex++;
+  }
+  return dates;
+}
+
 export async function generateDosesForSchedule(schedule: Schedule, daysAhead = 30) {
   const startDate = new Date(schedule.startDate + 'T00:00:00');
   const endDate = schedule.endDate ? new Date(schedule.endDate + 'T23:59:59') : null;
   const now = new Date();
-
-  const genStart = startDate > now ? startDate : new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const genStart =
+    startDate > now ? startDate : new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const genEnd = new Date();
   genEnd.setDate(genEnd.getDate() + daysAhead);
-
   if (endDate && endDate < genStart) return;
-
   const finalEnd = endDate && endDate < genEnd ? endDate : genEnd;
-  const { frequencyConfig } = schedule;
-  const dates: Date[] = [];
 
-  if (frequencyConfig.type === 'interval_hours' && frequencyConfig.intervalHours) {
-    const [h, m] = frequencyConfig.times[0].split(':').map(Number);
-    let current = new Date(genStart);
-    current.setHours(h, m, 0, 0);
-    if (current < genStart) {
-      const msSinceStart = genStart.getTime() - current.getTime();
-      const intervalsElapsed = Math.ceil(msSinceStart / (frequencyConfig.intervalHours * 3600000));
-      current = new Date(current.getTime() + intervalsElapsed * frequencyConfig.intervalHours * 3600000);
-    }
-    while (current <= finalEnd) {
-      dates.push(new Date(current));
-      current = new Date(current.getTime() + frequencyConfig.intervalHours * 3600000);
-    }
-  } else if (frequencyConfig.type === 'specific_days' && frequencyConfig.specificDays) {
-    let current = new Date(genStart);
-    current.setHours(0, 0, 0, 0);
-    while (current <= finalEnd) {
-      const dow = current.getDay();
-      if (frequencyConfig.specificDays.includes(dow)) {
-        for (const time of frequencyConfig.times) {
-          const [h, m2] = time.split(':').map(Number);
-          const d = new Date(current);
-          d.setHours(h, m2, 0, 0);
-          if (d >= genStart) dates.push(d);
-        }
-      }
-      current.setDate(current.getDate() + 1);
-    }
-  } else if (frequencyConfig.type === 'fixed_cycle' && frequencyConfig.daysOn && frequencyConfig.daysOff) {
-    const cycleLen = frequencyConfig.daysOn + frequencyConfig.daysOff;
-    const msPerDay = 24 * 3600000;
-    const daysSinceStart = Math.floor((genStart.getTime() - startDate.getTime()) / msPerDay);
-    let current = new Date(genStart);
-    current.setHours(0, 0, 0, 0);
-    let dayIndex = daysSinceStart;
-    while (current <= finalEnd) {
-      const posInCycle = ((dayIndex % cycleLen) + cycleLen) % cycleLen;
-      if (posInCycle < frequencyConfig.daysOn) {
-        for (const time of frequencyConfig.times) {
-          const [h, m2] = time.split(':').map(Number);
-          const d = new Date(current);
-          d.setHours(h, m2, 0, 0);
-          if (d >= genStart) dates.push(d);
-        }
-      }
-      current.setDate(current.getDate() + 1);
-      dayIndex++;
-    }
-  }
+  const { frequencyConfig: cfg } = schedule;
+  let dates: Date[] = [];
+  if (cfg.type === 'interval_hours') dates = buildIntervalDates(cfg, genStart, finalEnd);
+  else if (cfg.type === 'specific_days') dates = buildSpecificDaysDates(cfg, genStart, finalEnd);
+  else if (cfg.type === 'fixed_cycle')
+    dates = buildFixedCycleDates(cfg, genStart, finalEnd, startDate);
 
   for (const d of dates) {
-    const isoTime = d.toISOString();
+    const localTime = toLocalISOString(d);
     const existing = await db.getFirstAsync<{ id: number }>(
       'SELECT id FROM doses WHERE schedule_id = ? AND scheduled_time = ? AND profile_id = ?',
-      [schedule.id, isoTime, schedule.profileId]
+      [schedule.id, localTime, schedule.profileId]
     );
     if (!existing) {
       await db.runAsync(
         'INSERT INTO doses (profile_id, schedule_id, medicine_id, scheduled_time) VALUES (?, ?, ?, ?)',
-        [schedule.profileId, schedule.id, schedule.medicineId, isoTime]
+        [schedule.profileId, schedule.id, schedule.medicineId, localTime]
       );
     }
   }
+}
+
+// --- Cycle realignment ---
+
+/**
+ * When a dose is taken at a different time than scheduled on an interval_hours
+ * schedule, realign future pending doses so they originate from the actual
+ * taken time instead of the original anchor.
+ *
+ * Example: schedule every 8h anchored at 08:00 (→ 08:00, 16:00, 00:00).
+ * User takes at 00:15 → future doses become 08:15, 16:15, 00:15.
+ */
+export async function realignIntervalSchedule(
+  scheduleId: number,
+  takenTime: string,
+  daysAhead = 30
+): Promise<void> {
+  const profileId = requireActiveProfileId();
+
+  // Load the schedule
+  const row = await db.getFirstAsync<Record<string, unknown>>(
+    'SELECT * FROM schedules WHERE id = ? AND profile_id = ? AND is_active = 1',
+    [scheduleId, profileId]
+  );
+  if (!row) return;
+
+  const schedule = rowToSchedule(row);
+  const { frequencyConfig } = schedule;
+  if (frequencyConfig.type !== 'interval_hours' || !frequencyConfig.intervalHours) return;
+
+  const takenDate = new Date(takenTime);
+  const intervalMs = frequencyConfig.intervalHours * 3_600_000;
+  const now = new Date();
+
+  // Delete all future pending doses for this schedule
+  const pendingRows = await db.getAllAsync<{ id: number; notification_id: string | null }>(
+    `SELECT id, notification_id FROM doses
+     WHERE schedule_id = ? AND profile_id = ? AND status = 'pending' AND scheduled_time > ?`,
+    [scheduleId, profileId, toLocalISOString(now)]
+  );
+
+  for (const pending of pendingRows) {
+    if (pending.notification_id) {
+      // Cancel existing notification — imported lazily to avoid circular dep
+      const { cancelNotification } = await import('@/lib/notifications');
+      await cancelNotification(pending.notification_id).catch(() => {});
+    }
+    await db.runAsync('DELETE FROM doses WHERE id = ? AND profile_id = ?', [pending.id, profileId]);
+  }
+
+  // Regenerate doses starting from takenTime + 1 interval
+  const genEnd = new Date(now.getTime() + daysAhead * 24 * 3_600_000);
+  const endDate = schedule.endDate ? new Date(schedule.endDate + 'T23:59:59') : null;
+  const finalEnd = endDate && endDate < genEnd ? endDate : genEnd;
+
+  let next = new Date(takenDate.getTime() + intervalMs);
+  const newDates: Date[] = [];
+  while (next <= finalEnd) {
+    if (next > now) newDates.push(new Date(next));
+    next = new Date(next.getTime() + intervalMs);
+  }
+
+  // Update the anchor time in frequencyConfig so future regeneration stays aligned
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const newAnchor = `${pad(takenDate.getHours())}:${pad(takenDate.getMinutes())}`;
+  const updatedConfig: FrequencyConfig = { ...frequencyConfig, times: [newAnchor] };
+  await db.runAsync('UPDATE schedules SET frequency_config = ? WHERE id = ? AND profile_id = ?', [
+    JSON.stringify(updatedConfig),
+    scheduleId,
+    profileId,
+  ]);
+
+  // Insert new doses
+  for (const d of newDates) {
+    const localTime = toLocalISOString(d);
+    const existing = await db.getFirstAsync<{ id: number }>(
+      'SELECT id FROM doses WHERE schedule_id = ? AND scheduled_time = ? AND profile_id = ?',
+      [scheduleId, localTime, profileId]
+    );
+    if (!existing) {
+      await db.runAsync(
+        'INSERT INTO doses (profile_id, schedule_id, medicine_id, scheduled_time) VALUES (?, ?, ?, ?)',
+        [profileId, scheduleId, schedule.medicineId, localTime]
+      );
+    }
+  }
+}
+
+// --- Helpers ---
+
+function toLocalISOString(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 // --- Row mappers ---
