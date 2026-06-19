@@ -3,7 +3,8 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "expo start",
+    "start": "expo start --dev-client",
+    "start:go": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
     "ios": "expo run:ios",
@@ -11,6 +12,8 @@
     "lint": "expo lint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "test": "jest --watchAll=false",
+    "test:coverage": "jest --coverage --watchAll=false",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -34,6 +37,7 @@
     "@tanstack/react-query": "^5.99.2",
     "expo": "~54.0.33",
     "expo-constants": "~18.0.13",
+    "expo-dev-client": "~6.0.21",
     "expo-font": "~14.0.11",
     "expo-haptics": "~15.0.8",
     "expo-image": "~3.0.11",
@@ -65,12 +69,17 @@
   "devDependencies": {
     "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^21.0.2",
+    "@testing-library/jest-native": "^5.4.3",
+    "@testing-library/react-native": "^13.0.0",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.1.17",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
     "husky": "^9.1.7",
+    "jest-expo": "^56.0.5",
     "lint-staged": "^17.0.7",
     "prettier": "^3.8.4",
+    "react-test-renderer": "19.1.0",
     "typescript": "~5.9.3"
   },
   "private": true

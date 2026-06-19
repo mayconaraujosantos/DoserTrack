@@ -244,6 +244,8 @@ function ConfirmModal({
   const [isContinuous, setIsContinuous] = useState(state.isContinuous);
   const [dosage, setDosage] = useState(state.dosage);
 
+  const isSos = state.item.isSos === true;
+
   const freqLabel = state.item.frequencyHours
     ? `A cada ${state.item.frequencyHours}h`
     : state.item.timesPerDay
@@ -253,7 +255,7 @@ function ConfirmModal({
         : 'Conforme receita';
 
   function handleConfirm() {
-    if (times.length === 0) {
+    if (!isSos && times.length === 0) {
       Alert.alert('Atenção', 'Adicione pelo menos um horário.');
       return;
     }
@@ -289,12 +291,28 @@ function ConfirmModal({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-            <View style={modalStyles.section}>
-              <Text variant="caption" color={C.sub} style={modalStyles.sectionLabel}>
-                Frequência detectada
-              </Text>
-              <Text variant="body">{freqLabel}</Text>
-            </View>
+            {isSos && (
+              <View
+                style={[
+                  modalStyles.sosBanner,
+                  { backgroundColor: '#F4A26118', borderColor: '#F4A26144' },
+                ]}
+              >
+                <Ionicons name="alert-circle-outline" size={18} color="#F4A261" />
+                <Text variant="caption" color="#F4A261" style={{ flex: 1, lineHeight: 18 }}>
+                  Uso condicional (SOS): tome apenas quando necessário. Nenhum alarme será criado.
+                </Text>
+              </View>
+            )}
+
+            {!isSos && (
+              <View style={modalStyles.section}>
+                <Text variant="caption" color={C.sub} style={modalStyles.sectionLabel}>
+                  Frequência detectada
+                </Text>
+                <Text variant="body">{freqLabel}</Text>
+              </View>
+            )}
 
             {state.item.instructions ? (
               <View style={modalStyles.section}>
@@ -314,67 +332,79 @@ function ConfirmModal({
               />
             </View>
 
-            <View style={modalStyles.section}>
-              <Text variant="caption" color={C.sub} style={modalStyles.sectionLabel}>
-                Horários de lembrete
-              </Text>
-              <TimeChipRow
-                times={times}
-                onAdd={t => setTimes(prev => [...prev, t].sort())}
-                onRemove={t => setTimes(prev => prev.filter(x => x !== t))}
-              />
-            </View>
-
-            <View style={modalStyles.section}>
-              <View style={modalStyles.row}>
-                <Text variant="caption" color={C.sub}>
-                  Uso contínuo
-                </Text>
-                <TouchableOpacity
-                  style={[
-                    modalStyles.toggle,
-                    { backgroundColor: isContinuous ? C.primary : C.border },
-                  ]}
-                  onPress={toggleContinuous}
-                  accessibilityRole="switch"
-                  accessibilityState={{ checked: isContinuous }}
-                >
-                  <View
-                    style={[modalStyles.toggleThumb, isContinuous && modalStyles.toggleThumbOn]}
-                  />
-                </TouchableOpacity>
-              </View>
-
-              {!isContinuous && (
-                <View style={[modalStyles.row, { marginTop: 10 }]}>
-                  <Text variant="caption" color={C.sub} style={{ flex: 1 }}>
-                    Duração (dias)
+            {!isSos && (
+              <>
+                <View style={modalStyles.section}>
+                  <Text variant="caption" color={C.sub} style={modalStyles.sectionLabel}>
+                    Horários de lembrete
                   </Text>
-                  <TextInput
-                    style={[
-                      modalStyles.durationInput,
-                      { backgroundColor: C.card, borderColor: C.border, color: C.text },
-                    ]}
-                    keyboardType="number-pad"
-                    value={durationDays}
-                    onChangeText={setDurationDays}
-                    placeholder="30"
-                    placeholderTextColor={C.sub}
+                  <TimeChipRow
+                    times={times}
+                    onAdd={t => setTimes(prev => [...prev, t].sort())}
+                    onRemove={t => setTimes(prev => prev.filter(x => x !== t))}
                   />
                 </View>
-              )}
-            </View>
+
+                <View style={modalStyles.section}>
+                  <View style={modalStyles.row}>
+                    <Text variant="caption" color={C.sub}>
+                      Uso contínuo
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        modalStyles.toggle,
+                        { backgroundColor: isContinuous ? C.primary : C.border },
+                      ]}
+                      onPress={toggleContinuous}
+                      accessibilityRole="switch"
+                      accessibilityState={{ checked: isContinuous }}
+                    >
+                      <View
+                        style={[modalStyles.toggleThumb, isContinuous && modalStyles.toggleThumbOn]}
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  {!isContinuous && (
+                    <View style={[modalStyles.row, { marginTop: 10 }]}>
+                      <Text variant="caption" color={C.sub} style={{ flex: 1 }}>
+                        Duração (dias)
+                      </Text>
+                      <TextInput
+                        style={[
+                          modalStyles.durationInput,
+                          { backgroundColor: C.card, borderColor: C.border, color: C.text },
+                        ]}
+                        keyboardType="number-pad"
+                        value={durationDays}
+                        onChangeText={setDurationDays}
+                        placeholder="30"
+                        placeholderTextColor={C.sub}
+                      />
+                    </View>
+                  )}
+                </View>
+              </>
+            )}
           </ScrollView>
 
           <Button
             variant="primary"
             size="lg"
-            icon={<Ionicons name="alarm-outline" size={20} color="#fff" />}
+            icon={
+              isSos ? (
+                <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+              ) : (
+                <Ionicons name="alarm-outline" size={20} color="#fff" />
+              )
+            }
             onPress={handleConfirm}
             style={modalStyles.saveBtn}
-            accessibilityLabel="Salvar medicamento e criar alarmes"
+            accessibilityLabel={
+              isSos ? 'Salvar medicamento SOS' : 'Salvar medicamento e criar alarmes'
+            }
           >
-            Salvar e criar alarmes
+            {isSos ? 'Salvar medicamento' : 'Salvar e criar alarmes'}
           </Button>
         </View>
       </View>
@@ -415,6 +445,15 @@ const modalStyles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   saveBtn: { marginTop: 8 },
+  sosBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
 });
 
 // ─── MedicineResultCard ───────────────────────────────────────────────────────
@@ -477,12 +516,20 @@ function MedicineResultCard({
         )}
       </View>
 
+      {item.isSos && (
+        <View style={[styles.sosBadge, { backgroundColor: '#F4A26122' }]}>
+          <Ionicons name="alert-circle-outline" size={13} color="#F4A261" />
+          <Text variant="label" color="#F4A261">
+            Uso condicional (SOS) — sem alarmes automáticos
+          </Text>
+        </View>
+      )}
       {item.concentration && <ResultRow label="Concentração" value={item.concentration} C={C} />}
       <ResultRow label="Forma" value={TYPE_LABELS[item.type] ?? item.type} C={C} />
-      {item.frequencyHours != null && (
+      {!item.isSos && item.frequencyHours != null && (
         <ResultRow label="Frequência" value={`A cada ${item.frequencyHours}h`} C={C} />
       )}
-      {item.timesPerDay != null && !item.frequencyHours && (
+      {!item.isSos && item.timesPerDay != null && !item.frequencyHours && (
         <ResultRow label="Frequência" value={`${item.timesPerDay}x ao dia`} C={C} />
       )}
       {item.durationDays != null && (
@@ -597,6 +644,7 @@ export default function ScanPrescriptionScreen() {
 
   async function handleConfirmSave(state: ConfirmState) {
     const { item, times, durationDays, isContinuous, dosage } = state;
+    const isSos = item.isSos === true;
     setSavingKey(item.name);
     setConfirmState(null);
 
@@ -610,48 +658,58 @@ export default function ScanPrescriptionScreen() {
         lowStockThreshold: 2,
       });
 
-      const today = todayStr();
-      const parsedDuration = Number.parseInt(durationDays);
-      const endDate =
-        !isContinuous && !Number.isNaN(parsedDuration) && parsedDuration > 0
-          ? addDays(today, parsedDuration - 1)
-          : undefined;
+      if (!isSos) {
+        const today = todayStr();
+        const parsedDuration = Number.parseInt(durationDays);
+        const endDate =
+          !isContinuous && !Number.isNaN(parsedDuration) && parsedDuration > 0
+            ? addDays(today, parsedDuration - 1)
+            : undefined;
 
-      let freqConfig;
-      if (item.frequencyHours) {
-        freqConfig = { type: 'interval_hours' as const, intervalHours: item.frequencyHours, times };
-      } else if (item.timesPerWeek) {
-        freqConfig = { type: 'specific_days' as const, specificDays: [1], times };
-      } else {
-        freqConfig = { type: 'specific_days' as const, specificDays: [0, 1, 2, 3, 4, 5, 6], times };
-      }
+        let freqConfig;
+        if (item.frequencyHours) {
+          freqConfig = {
+            type: 'interval_hours' as const,
+            intervalHours: item.frequencyHours,
+            times,
+          };
+        } else if (item.timesPerWeek) {
+          freqConfig = { type: 'specific_days' as const, specificDays: [1], times };
+        } else {
+          freqConfig = {
+            type: 'specific_days' as const,
+            specificDays: [0, 1, 2, 3, 4, 5, 6],
+            times,
+          };
+        }
 
-      const schedule = await createSchedule({
-        medicineId: medicine.id,
-        dosage,
-        frequencyConfig: freqConfig,
-        startDate: today,
-        endDate,
-        isActive: true,
-      });
+        const schedule = await createSchedule({
+          medicineId: medicine.id,
+          dosage,
+          frequencyConfig: freqConfig,
+          startDate: today,
+          endDate,
+          isActive: true,
+        });
 
-      await generateDosesForSchedule(schedule, 30);
+        await generateDosesForSchedule(schedule, 30);
 
-      const now = new Date();
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(now);
-        d.setDate(d.getDate() + i);
-        const dateStr = d.toISOString().split('T')[0];
-        const doses = await getDosesForDate(dateStr);
-        for (const dose of doses) {
-          if (dose.scheduleId === schedule.id && new Date(dose.scheduledTime) > now) {
-            const notifId = await scheduleDoseNotification({
-              id: dose.id,
-              medicineName: medicine.name,
-              dosage: schedule.dosage,
-              scheduledTime: dose.scheduledTime,
-            });
-            if (notifId) await updateDoseNotificationId(dose.id, notifId);
+        const now = new Date();
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(now);
+          d.setDate(d.getDate() + i);
+          const dateStr = d.toISOString().split('T')[0];
+          const doses = await getDosesForDate(dateStr);
+          for (const dose of doses) {
+            if (dose.scheduleId === schedule.id && new Date(dose.scheduledTime) > now) {
+              const notifId = await scheduleDoseNotification({
+                id: dose.id,
+                medicineName: medicine.name,
+                dosage: schedule.dosage,
+                scheduledTime: dose.scheduledTime,
+              });
+              if (notifId) await updateDoseNotificationId(dose.id, notifId);
+            }
           }
         }
       }
@@ -847,4 +905,13 @@ const styles = StyleSheet.create({
   resultValue: { flex: 2, textAlign: 'right' },
   retryBtn: { alignItems: 'center', paddingVertical: 8 },
   retryBtnText: { textDecorationLine: 'underline' },
+  sosBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
 });

@@ -18,9 +18,10 @@ Retorne APENAS um array JSON válido (sem markdown, sem bloco de código, sem te
     "type": "drop|tablet|capsule|ml|injection|other",
     "quantity": número inteiro de unidades prescritas ou null,
     "instructions": "Instruções completas de uso",
-    "frequencyHours": horas entre doses para intervalo fixo (8 para '8/8h', 12 para '12/12h', 24 para '1x ao dia em intervalo') — use SOMENTE quando a posologia for expressa como intervalo em horas, caso contrário null,
-    "timesPerDay": número de doses por dia quando NÃO for intervalo de horas (1 para 'tomar 1 comprimido ao dia', 2 para 'manhã e noite') ou null,
-    "timeHints": array com os descritores de horário encontrados na instrução, ex: ["manhã"], ["após jantar"], ["manhã", "noite"], ["em jejum"] — extraia literalmente do texto, array vazio [] se não houver,
+    "isSos": true se a posologia for CONDICIONAL — contiver termos como 'caso haja', 'se necessário', 'quando necessário', 'em caso de dor', 'em caso de febre', 'se dor', 'se febre', 'SOS', 'S/N', 'PRN', 'conforme necessidade', 'se precisar' — false para medicamentos de horário fixo,
+    "frequencyHours": horas entre doses para intervalo fixo (8 para '8/8h', 12 para '12/12h', 24 para '1x ao dia em intervalo') — null quando isSos for true ou quando não for intervalo fixo,
+    "timesPerDay": número de doses por dia quando NÃO for intervalo de horas e NÃO for SOS (1 para 'tomar 1 comprimido ao dia', 2 para 'manhã e noite') — null quando isSos for true,
+    "timeHints": array com os descritores de horário encontrados na instrução, ex: ["manhã"], ["após jantar"], ["manhã", "noite"], ["em jejum"] — array vazio [] quando isSos for true ou se não houver,
     "timesPerWeek": número de doses por semana apenas para uso semanal (1 para '1x por semana', 2 para '2x por semana') ou null,
     "durationDays": dias de tratamento ou null se não especificado,
     "isContinuous": true se houver 'USO CONTÍNUO', 'uso permanente', 'por tempo indeterminado' ou similar, false caso contrário,
@@ -36,14 +37,20 @@ Regras para o campo "type":
 - "injection" → injeção, ampola, frasco-ampola
 - "other" → adesivo, creme, pomada, supositório, inalador e demais
 
-Exemplos de mapeamento de frequência:
-- "8/8hs" → frequencyHours: 8, timesPerDay: null
-- "12/12h" → frequencyHours: 12, timesPerDay: null
-- "1 comprimido pela manhã - USO CONTÍNUO" → frequencyHours: null, timesPerDay: 1, timeHints: ["manhã"], isContinuous: true
-- "após o jantar - USO CONTÍNUO" → frequencyHours: null, timesPerDay: 1, timeHints: ["após jantar"], isContinuous: true
-- "manhã e noite por 30 dias" → frequencyHours: null, timesPerDay: 2, timeHints: ["manhã", "noite"], durationDays: 30
-- "1 vez por semana" → frequencyHours: null, timesPerWeek: 1, timesPerDay: null
-- "2 vezes por semana" → frequencyHours: null, timesPerWeek: 2, timesPerDay: null
+Regras para o campo "isSos":
+- isSos: true → "caso haja dor", "se febre", "se necessário", "quando necessário", "em caso de", "SOS", "PRN", "conforme necessidade"
+- isSos: false → uso regular com horário ou intervalo fixo, mesmo que tenha duração definida
+- Quando isSos: true → frequencyHours: null, timesPerDay: null, timesPerWeek: null, timeHints: []
+
+Exemplos de mapeamento:
+- "8/8hs" → frequencyHours: 8, timesPerDay: null, isSos: false
+- "12/12h" → frequencyHours: 12, timesPerDay: null, isSos: false
+- "1 comprimido pela manhã - USO CONTÍNUO" → frequencyHours: null, timesPerDay: 1, timeHints: ["manhã"], isContinuous: true, isSos: false
+- "após o jantar - USO CONTÍNUO" → frequencyHours: null, timesPerDay: 1, timeHints: ["após jantar"], isContinuous: true, isSos: false
+- "manhã e noite por 30 dias" → frequencyHours: null, timesPerDay: 2, timeHints: ["manhã", "noite"], durationDays: 30, isSos: false
+- "1 vez por semana" → frequencyHours: null, timesPerWeek: 1, timesPerDay: null, isSos: false
+- "de 6 em 6 horas, caso haja dor ou febre" → frequencyHours: null, timesPerDay: null, isSos: true
+- "se necessário, até 3x ao dia" → frequencyHours: null, timesPerDay: null, isSos: true
 
 Liste todos os medicamentos encontrados na receita, um objeto por medicamento.`;
 

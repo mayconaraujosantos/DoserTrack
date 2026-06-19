@@ -117,14 +117,27 @@ export default function RootLayout() {
     requestNotificationPermissions().catch(console.error);
 
     hasSeenOnboarding()
-      .then(seen => {
-        if (!seen) router.replace('/onboarding');
+      .then(async seen => {
+        if (!seen) {
+          router.replace('/onboarding');
+          return;
+        }
+        // Já viu onboarding — verifica sessão ativa
+        const { getSession } = await import('@/lib/auth');
+        const session = await getSession();
+        if (!session) router.replace('/login');
       })
       .catch(console.error);
 
     const authSub = onAuthStateChange(event => {
       if (event === 'SIGNED_IN') {
         pullFromCloud().catch(console.error);
+      }
+      if (event === 'SIGNED_OUT') {
+        router.replace('/login');
+      }
+      if (event === 'PASSWORD_RECOVERY') {
+        router.replace('/reset-password' as never);
       }
     });
 
@@ -189,11 +202,18 @@ export default function RootLayout() {
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-            <Stack.Screen name="auth" options={{ headerShown: false }} />
-            <Stack.Screen name="auth-callback" options={{ headerShown: false }} />
+            <Stack.Screen name="login" options={{ headerShown: false }} />
+            <Stack.Screen name="register" options={{ headerShown: false }} />
+            <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+            <Stack.Screen name="reset-password" options={{ headerShown: false }} />
+            <Stack.Screen name="complete-profile" options={{ headerShown: false }} />
             <Stack.Screen
               name="scan-prescription"
               options={{ presentation: 'modal', title: 'Escanear Receita' }}
+            />
+            <Stack.Screen
+              name="scan-medicine"
+              options={{ presentation: 'modal', title: 'Escanear Embalagem' }}
             />
             <Stack.Screen
               name="add-medicine"
@@ -243,7 +263,7 @@ const errorStyles = StyleSheet.create({
     marginTop: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#4A90D9',
+    backgroundColor: Colors.light.primary,
     borderRadius: 12,
   },
   btnText: { color: '#fff', fontWeight: '700', fontSize: 15 },

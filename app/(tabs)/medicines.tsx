@@ -284,10 +284,10 @@ export default function MedicinesScreen() {
   );
 
   const renderSectionHeader = useCallback(
-    ({ section }: { section: { title: string } }) => (
+    ({ section: { title } }: { section: { title: string; data: readonly Medicine[] } }) => (
       <View style={[styles.sectionHeader, { backgroundColor: C.bg }]}>
         <Text variant="caption" color={C.sub} style={styles.sectionLetter}>
-          {section.title}
+          {title}
         </Text>
         <View style={[styles.sectionLine, { backgroundColor: C.border }]} />
       </View>
@@ -360,8 +360,20 @@ export default function MedicinesScreen() {
                 variant="primary"
                 size={20}
                 boxSize={40}
-                onPress={() => router.push('/scan-prescription' as never)}
-                accessibilityLabel="Escanear receita"
+                onPress={() =>
+                  Alert.alert('Escanear com IA', 'O que você quer fotografar?', [
+                    {
+                      text: 'Embalagem do remédio',
+                      onPress: () => router.push('/scan-medicine' as never),
+                    },
+                    {
+                      text: 'Receita médica',
+                      onPress: () => router.push('/scan-prescription' as never),
+                    },
+                    { text: 'Cancelar', style: 'cancel' },
+                  ])
+                }
+                accessibilityLabel="Escanear com IA"
               />
               <TouchableOpacity
                 style={[styles.addBtn, { backgroundColor: C.primary }]}
@@ -439,7 +451,7 @@ export default function MedicinesScreen() {
 
       {/* ── List ────────────────────────────────────────────────────────────── */}
       {!isLoading && sections.length > 0 && (
-        <SectionList
+        <SectionList<Medicine, { title: string }>
           sections={sections}
           keyExtractor={item => String(item.id)}
           renderItem={renderItem}

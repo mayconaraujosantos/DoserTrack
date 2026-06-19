@@ -2,25 +2,25 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    primary: '#4A90D9',
+    primary: '#5D54FF',
     success: '#27AE60',
     warning: '#F39C12',
     danger: '#E74C3C',
-    bg: '#F0F4F8',
+    bg: '#F2F8FF',
     card: '#FFFFFF',
-    text: '#2C3E50',
-    sub: '#7F8C8D',
+    text: '#000000',
+    sub: '#888888',
     border: '#E8EBED',
     // react-navigation compatibility
-    background: '#F0F4F8',
-    tint: '#4A90D9',
-    icon: '#7F8C8D',
-    tabIconDefault: '#7F8C8D',
-    tabIconSelected: '#4A90D9',
+    background: '#F2F8FF',
+    tint: '#5D54FF',
+    icon: '#888888',
+    tabIconDefault: '#888888',
+    tabIconSelected: '#5D54FF',
     notification: '#E74C3C',
   },
   dark: {
-    primary: '#5B9FE6',
+    primary: '#7B74FF',
     success: '#2ECC71',
     warning: '#F39C12',
     danger: '#E05252',
@@ -31,10 +31,10 @@ export const Colors = {
     border: '#253047',
     // react-navigation compatibility
     background: '#0F1117',
-    tint: '#5B9FE6',
+    tint: '#7B74FF',
     icon: '#8899A6',
     tabIconDefault: '#8899A6',
-    tabIconSelected: '#5B9FE6',
+    tabIconSelected: '#7B74FF',
     notification: '#E05252',
   },
 };

@@ -19,6 +19,8 @@ export interface PrescriptionData {
   durationDays?: number;
   // true quando houver "USO CONTÍNUO", "uso permanente" ou similar
   isContinuous?: boolean;
+  // true para medicamentos condicionais: "se necessário", "caso haja dor/febre", SOS, PRN
+  isSos?: boolean;
   doctorName?: string;
 }
 

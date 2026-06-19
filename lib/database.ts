@@ -571,8 +571,7 @@ export async function generateDosesForSchedule(schedule: Schedule, daysAhead = 3
   const startDate = new Date(schedule.startDate + 'T00:00:00');
   const endDate = schedule.endDate ? new Date(schedule.endDate + 'T23:59:59') : null;
   const now = new Date();
-  const genStart =
-    startDate > now ? startDate : new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const genStart = startDate > now ? startDate : now;
   const genEnd = new Date();
   genEnd.setDate(genEnd.getDate() + daysAhead);
   if (endDate && endDate < genStart) return;
