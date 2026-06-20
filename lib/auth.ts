@@ -1,5 +1,8 @@
 import type { Session, AuthChangeEvent, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
+
+const log = logger.make('Auth');
 
 export type { AuthError };
 
@@ -25,7 +28,11 @@ export async function signIn(email: string, password: string): Promise<AuthUser>
   };
 }
 
-export async function signUp(email: string, password: string, name: string): Promise<AuthUser> {
+export interface SignUpResult extends AuthUser {
+  needsEmailConfirmation: boolean;
+}
+
+export async function signUp(email: string, password: string, name: string): Promise<SignUpResult> {
   const client = assertSupabase();
   const { data, error } = await client.auth.signUp({
     email,
@@ -37,6 +44,7 @@ export async function signUp(email: string, password: string, name: string): Pro
     id: data.user!.id,
     email: data.user!.email,
     displayName: name,
+    needsEmailConfirmation: !data.session,
   };
 }
 
@@ -61,8 +69,14 @@ export async function updatePassword(newPassword: string): Promise<void> {
 }
 
 export async function getSession(): Promise<Session | null> {
-  if (!supabase) return null;
-  const { data } = await supabase.auth.getSession();
+  if (!supabase) {
+    log.warn('supabase não configurado — sessão nula');
+    return null;
+  }
+  const done = log.time('supabase.auth.getSession');
+  const { data, error } = await supabase.auth.getSession();
+  done();
+  if (error) log.error('getSession error:', error.message);
   return data.session;
 }
 
