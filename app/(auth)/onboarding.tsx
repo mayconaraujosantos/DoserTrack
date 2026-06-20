@@ -1,314 +1,383 @@
-import { useRef, useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  FlatList,
-  Dimensions,
-  Animated,
-  type ListRenderItemInfo,
-} from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { Dimensions, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  interpolateColor,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  type SharedValue,
+} from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { markOnboardingDone } from '@/lib/storage';
 import { useTheme } from '@/hooks/use-theme';
+import { Text } from '@/components/ui/Text';
 
 const { width: W } = Dimensions.get('window');
+
+// ─── Slides ───────────────────────────────────────────────────────────────────
 
 const SLIDES = [
   {
     key: 'welcome',
     icon: 'medical' as const,
-    title: 'Bem-vindo ao Doser',
+    color: '#5D54FF',
+    title: 'Bem-vindo ao DoserTrack',
     subtitle: 'Seu assistente pessoal para nunca esquecer um remédio.',
   },
   {
     key: 'scan',
     icon: 'scan-outline' as const,
+    color: '#00B4D8',
     title: 'Escaneie sua receita',
-    subtitle:
-      'Fotografe a receita médica e o Doser preenche os medicamentos automaticamente com IA.',
+    subtitle: 'Fotografe a receita médica e preenchemos os medicamentos automaticamente com IA.',
   },
   {
     key: 'medicines',
     icon: 'medkit-outline' as const,
+    color: '#06D6A0',
     title: 'Controle seu estoque',
-    subtitle: 'Acompanhe a quantidade de cada medicamento e receba alertas antes de acabar.',
+    subtitle: 'Acompanhe a quantidade de cada remédio e receba alertas antes de acabar.',
   },
   {
     key: 'schedule',
     icon: 'alarm-outline' as const,
-    title: 'Nunca esqueça uma dose',
-    subtitle: 'Defina a frequência — diária, intervalos ou ciclos. O Doser notifica na hora certa.',
+    color: '#FF6B6B',
+    title: 'Nunca perca uma dose',
+    subtitle: 'Defina frequência e horário. O DoserTrack notifica na hora certa.',
   },
 ] as const;
+
+type Slide = (typeof SLIDES)[number];
+
+// Valores para interpolateColor devem ser literais acessíveis na worklet
+const SLIDE_COLORS = SLIDES.map(s => s.color);
+const SLIDE_BG_TINTS = SLIDES.map(s => s.color + '12');
+const SLIDE_OFFSETS = SLIDES.map((_, i) => i * W);
+
+// ─── PaginationDot ────────────────────────────────────────────────────────────
+
+function PaginationDot({ index, scrollX }: { index: number; scrollX: SharedValue<number> }) {
+  const style = useAnimatedStyle(() => {
+    const inputRange = [(index - 1) * W, index * W, (index + 1) * W];
+    const width = interpolate(scrollX.value, inputRange, [8, 28, 8], Extrapolation.CLAMP);
+    const opacity = interpolate(scrollX.value, inputRange, [0.3, 1, 0.3], Extrapolation.CLAMP);
+    const backgroundColor = interpolateColor(scrollX.value, SLIDE_OFFSETS, SLIDE_COLORS);
+    return { width, opacity, backgroundColor };
+  });
+  return <Animated.View style={[styles.dot, style]} />;
+}
+
+// ─── SlideItem ────────────────────────────────────────────────────────────────
+
+function SlideItem({
+  item,
+  index,
+  scrollX,
+}: {
+  item: Slide;
+  index: number;
+  scrollX: SharedValue<number>;
+}) {
+  const C = useTheme();
+
+  const iconStyle = useAnimatedStyle(() => {
+    const inputRange = [(index - 1) * W, index * W, (index + 1) * W];
+    const scale = interpolate(scrollX.value, inputRange, [0.6, 1, 0.6], Extrapolation.CLAMP);
+    const opacity = interpolate(scrollX.value, inputRange, [0, 1, 0], Extrapolation.CLAMP);
+    return { transform: [{ scale }], opacity };
+  });
+
+  const textStyle = useAnimatedStyle(() => {
+    const inputRange = [(index - 1) * W, index * W, (index + 1) * W];
+    const translateY = interpolate(scrollX.value, inputRange, [48, 0, -32], Extrapolation.CLAMP);
+    const opacity = interpolate(scrollX.value, inputRange, [0, 1, 0], Extrapolation.CLAMP);
+    return { transform: [{ translateY }], opacity };
+  });
+
+  return (
+    <View style={[styles.slide, { width: W }]}>
+      {/* Illustration */}
+      <Animated.View style={[styles.illustrationWrap, iconStyle]}>
+        <View style={[styles.iconRingOuter, { backgroundColor: item.color + '12' }]}>
+          <View style={[styles.iconRingInner, { backgroundColor: item.color + '22' }]}>
+            <Ionicons name={item.icon} size={68} color={item.color} />
+          </View>
+        </View>
+      </Animated.View>
+
+      {/* Text */}
+      <Animated.View style={[styles.textBlock, textStyle]}>
+        <Text
+          style={[styles.slideTitle, { color: C.text }]}
+          maxFontSizeMultiplier={1.2}
+          numberOfLines={2}
+          adjustsFontSizeToFit
+        >
+          {item.title}
+        </Text>
+        <Text style={[styles.slideSubtitle, { color: C.sub }]} maxFontSizeMultiplier={1.2}>
+          {item.subtitle}
+        </Text>
+      </Animated.View>
+    </View>
+  );
+}
+
+// ─── OnboardingScreen ─────────────────────────────────────────────────────────
 
 export default function OnboardingScreen() {
   const C = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const listRef = useRef<FlatList>(null);
-  const [current, setCurrent] = useState(0);
-  const [showSplash, setShowSplash] = useState(true);
-  const splashOpacity = useRef(new Animated.Value(1)).current;
+  const listRef = useRef<FlatList<Slide>>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const scrollX = useSharedValue(0);
 
-  // Splash screen: 1.5s → fade out
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      Animated.timing(splashOpacity, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }).start(() => setShowSplash(false));
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [splashOpacity]);
+  const scrollHandler = useAnimatedScrollHandler(e => {
+    scrollX.value = e.contentOffset.x;
+  });
 
-  async function finishOnboarding(destination: '/login' | '/register') {
+  const isLast = currentIndex === SLIDES.length - 1;
+  const activeColor = SLIDES[currentIndex]?.color ?? C.primary;
+
+  function goTo(index: number) {
+    listRef.current?.scrollToIndex({ index, animated: true });
+    setCurrentIndex(index);
+  }
+
+  async function finish(destination: '/login' | '/register') {
     await markOnboardingDone();
     router.replace(destination);
   }
 
-  function goToSlide(index: number) {
-    listRef.current?.scrollToIndex({ index, animated: true });
-    setCurrent(index);
-  }
+  const renderSlide = useCallback(
+    ({ item, index }: { item: Slide; index: number }) => (
+      <SlideItem item={item} index={index} scrollX={scrollX} />
+    ),
+    [scrollX]
+  );
 
-  function handleNext() {
-    if (current < SLIDES.length - 1) {
-      goToSlide(current + 1);
-    }
-  }
+  // Background animado
+  const bgStyle = useAnimatedStyle(() => {
+    const backgroundColor = interpolateColor(scrollX.value, SLIDE_OFFSETS, SLIDE_BG_TINTS);
+    return { backgroundColor };
+  });
 
-  function handlePrev() {
-    if (current > 0) {
-      goToSlide(current - 1);
-    }
-  }
-
-  function handleSkip() {
-    goToSlide(SLIDES.length - 1);
-  }
-
-  function renderSlide({ item }: ListRenderItemInfo<(typeof SLIDES)[number]>) {
-    return (
-      <View style={[styles.slide, { width: W }]}>
-        <View style={[styles.iconCircle, { backgroundColor: C.primary + '18' }]}>
-          <Ionicons name={item.icon} size={72} color={C.primary} />
-        </View>
-        <Text style={[styles.slideTitle, { color: C.text }]}>{item.title}</Text>
-        <Text style={[styles.slideSubtitle, { color: C.sub }]}>{item.subtitle}</Text>
-      </View>
+  // Nav row (não-último slide): fade out ao chegar no último
+  const navRowStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollX.value,
+      [(SLIDES.length - 2) * W, (SLIDES.length - 1) * W],
+      [1, 0],
+      Extrapolation.CLAMP
     );
-  }
+    return { opacity };
+  });
 
-  const isLast = current === SLIDES.length - 1;
+  // Last actions: fade in no último slide
+  const lastActionsStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollX.value,
+      [(SLIDES.length - 2) * W, (SLIDES.length - 1) * W],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
+    return { opacity };
+  });
 
   return (
-    <View style={[styles.root, { backgroundColor: C.bg }]}>
-      {/* Splash */}
-      {showSplash && (
-        <Animated.View
-          style={[styles.splash, { backgroundColor: C.primary, opacity: splashOpacity }]}
-        >
-          <View style={styles.splashLogoWrap}>
-            <Ionicons name="medical" size={64} color="#fff" />
-          </View>
-          <Text style={styles.splashName}>Doser</Text>
-        </Animated.View>
-      )}
+    <Animated.View style={[styles.root, { backgroundColor: C.bg }, bgStyle]}>
+      {/* Skip */}
+      <TouchableOpacity
+        style={[styles.skipBtn, { top: insets.top + 14, opacity: isLast ? 0 : 1 }]}
+        onPress={() => goTo(SLIDES.length - 1)}
+        disabled={isLast}
+        accessibilityLabel="Pular apresentação"
+      >
+        <Text style={[styles.skipText, { color: C.sub }]}>Pular</Text>
+      </TouchableOpacity>
 
-      {!showSplash && (
-        <>
-          {/* Botão Skip */}
-          {!isLast && (
+      {/* Slides */}
+      <Animated.FlatList
+        ref={listRef as never}
+        data={SLIDES}
+        renderItem={renderSlide}
+        keyExtractor={s => s.key}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        onMomentumScrollEnd={e => {
+          const idx = Math.round(e.nativeEvent.contentOffset.x / W);
+          setCurrentIndex(idx);
+        }}
+        getItemLayout={(_, index) => ({ length: W, offset: W * index, index })}
+        style={styles.list}
+      />
+
+      {/* Bottom */}
+      <View style={[styles.bottom, { paddingBottom: insets.bottom + 24 }]}>
+        {/* Pagination dots */}
+        <View style={styles.dotsRow}>
+          {SLIDES.map((_, i) => (
+            <PaginationDot key={i} index={i} scrollX={scrollX} />
+          ))}
+        </View>
+
+        {/* CTA area — ambos sempre renderizados, opacidade animada */}
+        <View style={styles.ctaWrap}>
+          {/* Nav row: voltar + próximo */}
+          <Animated.View
+            style={[styles.navRow, navRowStyle]}
+            pointerEvents={isLast ? 'none' : 'auto'}
+          >
             <TouchableOpacity
-              style={[styles.skipBtn, { top: insets.top + 16 }]}
-              onPress={handleSkip}
+              style={[
+                styles.circleBtn,
+                { backgroundColor: C.card, borderColor: C.border },
+                currentIndex === 0 && styles.invisible,
+              ]}
+              onPress={() => goTo(currentIndex - 1)}
+              disabled={currentIndex === 0}
+              accessibilityLabel="Slide anterior"
             >
-              <Text style={[styles.skipText, { color: C.sub }]}>Pular</Text>
+              <Ionicons name="arrow-back" size={20} color={C.text} />
             </TouchableOpacity>
-          )}
 
-          {/* Slides */}
-          <FlatList
-            ref={listRef}
-            data={SLIDES}
-            renderItem={renderSlide}
-            keyExtractor={s => s.key}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            scrollEnabled={false}
-            style={styles.list}
-            getItemLayout={(_, index) => ({ length: W, offset: W * index, index })}
-            onScrollToIndexFailed={() => {}}
-          />
+            <TouchableOpacity
+              style={[styles.circleBtn, styles.circleBtnNext, { backgroundColor: activeColor }]}
+              onPress={() => goTo(currentIndex + 1)}
+              accessibilityLabel="Próximo slide"
+            >
+              <Ionicons name="arrow-forward" size={22} color="#fff" />
+            </TouchableOpacity>
+          </Animated.View>
 
-          {/* Navegação */}
-          <View style={[styles.nav, { paddingBottom: insets.bottom + 24 }]}>
-            {isLast ? (
-              /* Último slide: dois botões */
-              <View style={styles.lastActions}>
-                <TouchableOpacity
-                  style={[styles.btnPrimary, { backgroundColor: C.primary }]}
-                  onPress={() => finishOnboarding('/register')}
-                >
-                  <Text style={styles.btnPrimaryText}>Criar conta</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.btnOutline, { borderColor: C.primary }]}
-                  onPress={() => finishOnboarding('/login')}
-                >
-                  <Text style={[styles.btnOutlineText, { color: C.primary }]}>Já tenho conta</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              /* Slides intermediários: ← dots → */
-              <View style={styles.navRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.navCircle,
-                    { backgroundColor: C.card, borderColor: C.border },
-                    current === 0 && styles.navCircleHidden,
-                  ]}
-                  onPress={handlePrev}
-                  disabled={current === 0}
-                  accessibilityLabel="Anterior"
-                >
-                  <Ionicons name="arrow-back" size={20} color={C.text} />
-                </TouchableOpacity>
-
-                <View style={styles.dotsCenter}>
-                  {SLIDES.map((s, i) => (
-                    <View
-                      key={s.key}
-                      style={[
-                        styles.dotSm,
-                        { backgroundColor: i === current ? C.primary : C.border },
-                        i === current && styles.dotSmActive,
-                      ]}
-                    />
-                  ))}
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.navCircle, { backgroundColor: C.primary }]}
-                  onPress={handleNext}
-                  accessibilityLabel="Próximo"
-                >
-                  <Ionicons name="arrow-forward" size={20} color="#fff" />
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        </>
-      )}
-    </View>
+          {/* Last slide: criar conta + login */}
+          <Animated.View
+            style={[StyleSheet.absoluteFill, styles.lastActions, lastActionsStyle]}
+            pointerEvents={isLast ? 'auto' : 'none'}
+          >
+            <TouchableOpacity
+              style={[styles.btnPrimary, { backgroundColor: activeColor }]}
+              onPress={() => finish('/register')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.btnPrimaryText}>Criar conta grátis</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btnOutline, { borderColor: activeColor }]}
+              onPress={() => finish('/login')}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.btnOutlineText, { color: activeColor }]}>Já tenho conta</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </View>
+    </Animated.View>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
-
-  // Splash
-  splash: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    zIndex: 10,
-  },
-  splashLogoWrap: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  splashName: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: 1,
-  },
-
-  // Slides
   list: { flex: 1 },
+
+  // Skip
+  skipBtn: { position: 'absolute', right: 24, zIndex: 10 },
+  skipText: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
+
+  // Slide
   slide: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 40,
-    gap: 20,
+    paddingHorizontal: 36,
+    gap: 32,
   },
-  iconCircle: {
+
+  // Icon illustration
+  illustrationWrap: { alignItems: 'center', justifyContent: 'center' },
+  iconRingOuter: {
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconRingInner: {
     width: 140,
     height: 140,
     borderRadius: 70,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
   },
+
+  // Text block
+  textBlock: { alignItems: 'center', gap: 12 },
   slideTitle: {
     fontSize: 26,
     fontWeight: '800',
+    lineHeight: 34,
     textAlign: 'center',
-    lineHeight: 32,
+    letterSpacing: -0.3,
   },
   slideSubtitle: {
-    fontSize: 16,
+    fontSize: 15,
+    lineHeight: 22,
     textAlign: 'center',
-    lineHeight: 24,
+    fontWeight: '400',
   },
 
-  // Skip
-  skipBtn: {
-    position: 'absolute',
-    right: 24,
-    zIndex: 5,
-  },
-  skipText: { fontSize: 14, fontWeight: '600' },
+  // Bottom
+  bottom: { paddingHorizontal: 28, gap: 28 },
+
+  // Dots
+  dotsRow: { flexDirection: 'row', justifyContent: 'center', gap: 6, alignItems: 'center' },
+  dot: { height: 8, borderRadius: 4 },
+
+  // CTA wrap
+  ctaWrap: { height: 120, justifyContent: 'center' },
 
   // Nav row
-  nav: { paddingHorizontal: 28 },
   navRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  navCircle: {
+  circleBtn: {
     width: 52,
     height: 52,
     borderRadius: 26,
-    borderWidth: 1,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  navCircleHidden: { opacity: 0 },
-  dotsCenter: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-  },
-  dotSm: { width: 8, height: 8, borderRadius: 4 },
-  dotSmActive: { width: 20 },
+  circleBtnNext: { borderWidth: 0, width: 60, height: 60, borderRadius: 30 },
+  invisible: { opacity: 0 },
 
-  // Last slide actions
-  lastActions: { gap: 12 },
+  // Last actions
+  lastActions: {
+    gap: 12,
+    justifyContent: 'center',
+  },
   btnPrimary: {
     height: 54,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   btnOutline: {
     height: 54,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
