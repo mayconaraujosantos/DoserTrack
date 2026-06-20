@@ -1,5 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import { getDatabase } from '@/lib/database';
+import { logger } from '@/lib/logger';
+
+const log = logger.make('Sync');
 
 async function getUserId(): Promise<string | null> {
   if (!supabase) return null;
@@ -11,16 +14,15 @@ export async function syncToCloud(): Promise<void> {
   if (!supabase) return;
   const userId = await getUserId();
   if (!userId) return;
+  const done = log.time('syncToCloud');
+  log.info('iniciando sync → cloud, userId:', userId);
 
   const db = getDatabase();
 
-  const medicines = await db.getAllAsync<Record<string, unknown>>(
-    'SELECT * FROM medicines WHERE user_id IS NULL OR user_id = ?',
-    [userId]
-  );
+  const medicines = await db.getAllAsync<Record<string, unknown>>('SELECT * FROM medicines');
   if (medicines.length > 0) {
     await supabase.from('medicines').upsert(
-      medicines.map((m) => ({
+      medicines.map(m => ({
         id: m.id,
         user_id: userId,
         profile_id: m.profile_id,
@@ -37,13 +39,10 @@ export async function syncToCloud(): Promise<void> {
     );
   }
 
-  const schedules = await db.getAllAsync<Record<string, unknown>>(
-    'SELECT * FROM schedules WHERE user_id IS NULL OR user_id = ?',
-    [userId]
-  );
+  const schedules = await db.getAllAsync<Record<string, unknown>>('SELECT * FROM schedules');
   if (schedules.length > 0) {
     await supabase.from('schedules').upsert(
-      schedules.map((s) => ({
+      schedules.map(s => ({
         id: s.id,
         user_id: userId,
         profile_id: s.profile_id,
@@ -60,13 +59,10 @@ export async function syncToCloud(): Promise<void> {
     );
   }
 
-  const doses = await db.getAllAsync<Record<string, unknown>>(
-    'SELECT * FROM doses WHERE user_id IS NULL OR user_id = ?',
-    [userId]
-  );
+  const doses = await db.getAllAsync<Record<string, unknown>>('SELECT * FROM doses');
   if (doses.length > 0) {
     await supabase.from('doses').upsert(
-      doses.map((d) => ({
+      doses.map(d => ({
         id: d.id,
         user_id: userId,
         profile_id: d.profile_id,
@@ -83,19 +79,19 @@ export async function syncToCloud(): Promise<void> {
       { onConflict: 'id' }
     );
   }
+  done();
 }
 
 export async function pullFromCloud(): Promise<void> {
   if (!supabase) return;
   const userId = await getUserId();
   if (!userId) return;
+  const done = log.time('pullFromCloud');
+  log.info('iniciando pull ← cloud, userId:', userId);
 
   const db = getDatabase();
 
-  const { data: medicines } = await supabase
-    .from('medicines')
-    .select('*')
-    .eq('user_id', userId);
+  const { data: medicines } = await supabase.from('medicines').select('*').eq('user_id', userId);
 
   if (medicines) {
     for (const m of medicines) {
@@ -110,18 +106,22 @@ export async function pullFromCloud(): Promise<void> {
            updated_at = excluded.updated_at
          WHERE excluded.updated_at > medicines.updated_at OR medicines.updated_at IS NULL`,
         [
-          m.id, m.profile_id, m.name, m.type, m.stock_quantity,
-          m.stock_unit, m.photo_uri ?? null, m.low_stock_threshold,
-          m.created_at, m.updated_at ?? null,
+          m.id,
+          m.profile_id,
+          m.name,
+          m.type,
+          m.stock_quantity,
+          m.stock_unit,
+          m.photo_uri ?? null,
+          m.low_stock_threshold,
+          m.created_at,
+          m.updated_at ?? null,
         ]
       );
     }
   }
 
-  const { data: schedules } = await supabase
-    .from('schedules')
-    .select('*')
-    .eq('user_id', userId);
+  const { data: schedules } = await supabase.from('schedules').select('*').eq('user_id', userId);
 
   if (schedules) {
     for (const s of schedules) {
@@ -135,18 +135,22 @@ export async function pullFromCloud(): Promise<void> {
            is_active = excluded.is_active, updated_at = excluded.updated_at
          WHERE excluded.updated_at > schedules.updated_at OR schedules.updated_at IS NULL`,
         [
-          s.id, s.profile_id, s.medicine_id, s.dosage, s.frequency_config,
-          s.start_date, s.end_date ?? null, s.is_active ? 1 : 0,
-          s.created_at, s.updated_at ?? null,
+          s.id,
+          s.profile_id,
+          s.medicine_id,
+          s.dosage,
+          s.frequency_config,
+          s.start_date,
+          s.end_date ?? null,
+          s.is_active ? 1 : 0,
+          s.created_at,
+          s.updated_at ?? null,
         ]
       );
     }
   }
 
-  const { data: doses } = await supabase
-    .from('doses')
-    .select('*')
-    .eq('user_id', userId);
+  const { data: doses } = await supabase.from('doses').select('*').eq('user_id', userId);
 
   if (doses) {
     for (const d of doses) {
@@ -160,11 +164,20 @@ export async function pullFromCloud(): Promise<void> {
            updated_at = excluded.updated_at
          WHERE excluded.updated_at > doses.updated_at OR doses.updated_at IS NULL`,
         [
-          d.id, d.profile_id, d.schedule_id, d.medicine_id, d.scheduled_time,
-          d.taken_time ?? null, d.status, d.skip_reason ?? null,
-          d.notification_id ?? null, d.created_at, d.updated_at ?? null,
+          d.id,
+          d.profile_id,
+          d.schedule_id,
+          d.medicine_id,
+          d.scheduled_time,
+          d.taken_time ?? null,
+          d.status,
+          d.skip_reason ?? null,
+          d.notification_id ?? null,
+          d.created_at,
+          d.updated_at ?? null,
         ]
       );
     }
   }
+  done();
 }
