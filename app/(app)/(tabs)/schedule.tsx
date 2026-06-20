@@ -7,13 +7,14 @@ import {
   ActivityIndicator,
   type ListRenderItemInfo,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { getDosesForDate, getDatesWithDosesInMonth } from '@/lib/database';
 import { useAppStore } from '@/lib/store';
 import { useTheme } from '@/hooks/use-theme';
+import { ScreenHeader, headerBtnStyle } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
 import type { Dose } from '@/types';
@@ -95,7 +96,6 @@ export default function ScheduleScreen() {
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const C = useTheme();
-  const insets = useSafeAreaInsets();
 
   const selectedDate = useAppStore(s => s.selectedDate);
   const setSelectedDate = useAppStore(s => s.setSelectedDate);
@@ -144,23 +144,19 @@ export default function ScheduleScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: C.bg }]}>
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          { paddingTop: insets.top + 12, backgroundColor: C.card, borderBottomColor: C.border },
-        ]}
-      >
-        <Text variant="heading">Agenda</Text>
-        <TouchableOpacity
-          style={[styles.addBtn, { backgroundColor: C.primary }]}
-          onPress={() => router.push('/add-medicine' as never)}
-          accessibilityLabel="Adicionar medicamento"
-          accessibilityRole="button"
-        >
-          <Ionicons name="add" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Agenda"
+        right={
+          <TouchableOpacity
+            style={headerBtnStyle.iconOnly}
+            onPress={() => router.push('/add-medicine')}
+            accessibilityLabel="Adicionar medicamento"
+            accessibilityRole="button"
+          >
+            <Ionicons name="add" size={24} color="#fff" />
+          </TouchableOpacity>
+        }
+      />
 
       {/* Calendar */}
       <Card variant="default" style={styles.calendarCard}>
@@ -200,6 +196,7 @@ export default function ScheduleScreen() {
             const isToday = dateStr === todayStr;
             const isSelected = dateStr === selectedDate;
             const hasDoses = datesWithDoses.has(dateStr);
+            const dayNumColor = isSelected ? '#fff' : isToday ? C.primary : C.text;
             return (
               <TouchableOpacity
                 key={dateStr}
@@ -214,7 +211,7 @@ export default function ScheduleScreen() {
               >
                 <Text
                   variant="body"
-                  color={isSelected ? '#fff' : isToday ? C.primary : C.text}
+                  color={dayNumColor}
                   style={isSelected || isToday ? styles.dayNumBold : undefined}
                 >
                   {day}
@@ -271,21 +268,6 @@ export default function ScheduleScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  addBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   calendarCard: { marginHorizontal: 16, marginTop: 12 },
   calNav: {
     flexDirection: 'row',

@@ -36,23 +36,12 @@ export default function TabLayout() {
           shadowRadius: 8,
         },
         headerShown: false,
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{ title: 'Hoje', tabBarIcon: TodayIcon }}
-      />
-      <Tabs.Screen
-        name="medicines"
-        options={{ title: 'Remédios', tabBarIcon: MedsIcon }}
-      />
-      <Tabs.Screen
-        name="schedule"
-        options={{ title: 'Agenda', tabBarIcon: ScheduleIcon }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{ title: 'Histórico', tabBarIcon: HistoryIcon }}
-      />
+      }}
+    >
+      <Tabs.Screen name="index" options={{ title: 'Hoje', tabBarIcon: TodayIcon }} />
+      <Tabs.Screen name="medicines" options={{ title: 'Remédios', tabBarIcon: MedsIcon }} />
+      <Tabs.Screen name="schedule" options={{ title: 'Agenda', tabBarIcon: ScheduleIcon }} />
+      <Tabs.Screen name="history" options={{ title: 'Histórico', tabBarIcon: HistoryIcon }} />
     </Tabs>
   );
 }

@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { createProfile, getProfiles, setActiveProfileId } from '@/lib/database';
 import { setStoredActiveProfileId } from '@/lib/storage';
 import { useAppStore } from '@/lib/store';
+import { signOut } from '@/lib/auth';
 import { useTheme } from '@/hooks/use-theme';
 import {
   isBiometricsAvailable,
@@ -221,17 +222,39 @@ export default function ProfilesScreen() {
             </Text>
           }
           ListFooterComponent={
-            <TouchableOpacity
-              onPress={() => router.push('/privacy-policy' as never)}
-              style={styles.privacyLink}
-              accessibilityRole="link"
-              accessibilityLabel="Ver Política de Privacidade"
-            >
-              <Ionicons name="shield-checkmark-outline" size={14} color={C.sub} />
-              <Text variant="caption" color={C.sub}>
-                Política de Privacidade
-              </Text>
-            </TouchableOpacity>
+            <View>
+              <TouchableOpacity
+                style={[styles.logoutBtn, { borderColor: '#E74C3C' }]}
+                onPress={() =>
+                  Alert.alert('Sair da conta', 'Deseja realmente sair?', [
+                    { text: 'Cancelar', style: 'cancel' },
+                    {
+                      text: 'Sair',
+                      style: 'destructive',
+                      onPress: () => signOut().catch(() => null),
+                    },
+                  ])
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Sair da conta"
+              >
+                <Ionicons name="log-out-outline" size={18} color="#E74C3C" />
+                <Text variant="label" color="#E74C3C">
+                  Sair da conta
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.push('/privacy-policy' as never)}
+                style={styles.privacyLink}
+                accessibilityRole="link"
+                accessibilityLabel="Ver Política de Privacidade"
+              >
+                <Ionicons name="shield-checkmark-outline" size={14} color={C.sub} />
+                <Text variant="caption" color={C.sub}>
+                  Política de Privacidade
+                </Text>
+              </TouchableOpacity>
+            </View>
           }
         />
       )}
@@ -256,6 +279,17 @@ const styles = StyleSheet.create({
   listContent: { paddingHorizontal: 16, paddingBottom: 24, gap: 10 },
   loadingWrap: { paddingTop: 32, alignItems: 'center' },
   emptyText: { textAlign: 'center', marginTop: 24 },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
   privacyLink: {
     flexDirection: 'row',
     alignItems: 'center',

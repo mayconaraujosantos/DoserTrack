@@ -45,8 +45,7 @@ export default function CompleteProfileScreen() {
 
   async function handleComplete() {
     setLoading(true);
-    // Perfil opcional — navega direto para /(tabs)
-    router.replace('/(tabs)');
+    router.replace('/');
   }
 
   return (
@@ -172,7 +171,7 @@ export default function CompleteProfileScreen() {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
+        <TouchableOpacity onPress={() => router.replace('/')}>
           <Text style={[styles.skipText, { color: C.sub }]}>Pular por agora</Text>
         </TouchableOpacity>
       </View>

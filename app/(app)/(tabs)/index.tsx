@@ -1,5 +1,6 @@
 import { Text } from '@/components/ui/Text';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useTheme } from '@/hooks/use-theme';
 import { getDosesForDate, getDosesForDateRange, updateDoseStatus } from '@/lib/database';
 import { haptic } from '@/lib/haptics';
 import { useAppStore } from '@/lib/store';
@@ -11,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   Image,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -303,6 +305,7 @@ export default function DashboardScreen() {
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
 
   const C = useHomeColors();
+  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const qc = useQueryClient();
@@ -448,23 +451,25 @@ export default function DashboardScreen() {
   const greeting = activeProfile?.name ? `Olá, ${activeProfile.name.split(' ')[0]}!` : 'Olá!';
 
   return (
-    <View style={[styles.container, { backgroundColor: C.bg, paddingTop: insets.top }]}>
+    <View style={[styles.container, { backgroundColor: C.bg }]}>
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <View style={styles.header}>
+      <View
+        style={[styles.header, { paddingTop: insets.top + 14, backgroundColor: theme.primary }]}
+      >
         <View style={styles.logoRow}>
-          <View style={[styles.logoIcon, { backgroundColor: C.primary }]}>
-            <Ionicons name="medical" size={16} color={C.card} />
+          <View style={styles.logoIcon}>
+            <Ionicons name="medical" size={16} color="#fff" />
           </View>
-          <Text style={[styles.logoText, { color: C.primary }]}>Doser</Text>
+          <Text style={styles.logoText}>Doser</Text>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity
-            style={[styles.iconBtn, { backgroundColor: C.card, shadowColor: C.primary }]}
+            style={styles.iconBtn}
             onPress={() => router.push('/scan-prescription')}
             accessibilityLabel="Escanear receita"
             accessibilityRole="button"
           >
-            <Ionicons name="scan-outline" size={20} color={C.primary} />
+            <Ionicons name="scan-outline" size={20} color="#fff" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.avatarBtn}
@@ -473,14 +478,14 @@ export default function DashboardScreen() {
             accessibilityRole="button"
           >
             {activeProfile ? (
-              <View style={[styles.avatarInner, { backgroundColor: activeProfile.color + '33' }]}>
-                <Text style={[styles.avatarInitial, { color: activeProfile.color }]}>
+              <View style={[styles.avatarInner, { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
+                <Text style={[styles.avatarInitial, { color: '#fff' }]}>
                   {activeProfile.name[0]?.toUpperCase()}
                 </Text>
               </View>
             ) : (
-              <View style={[styles.avatarInner, { backgroundColor: C.primary + '22' }]}>
-                <Ionicons name="person" size={18} color={C.primary} />
+              <View style={[styles.avatarInner, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
+                <Ionicons name="person" size={18} color="#fff" />
               </View>
             )}
           </TouchableOpacity>
@@ -489,8 +494,21 @@ export default function DashboardScreen() {
 
       {/* ── Greeting (fixo) ────────────────────────────────────────────── */}
       <View style={styles.greetingSection}>
-        <Text style={[styles.dateSmall, { color: C.sub }]}>{dateLabel}</Text>
-        <Text style={[styles.greetingText, { color: C.primary }]}>{greeting}</Text>
+        <Text
+          style={[styles.dateSmall, { color: C.sub }]}
+          numberOfLines={1}
+          maxFontSizeMultiplier={1.1}
+        >
+          {dateLabel}
+        </Text>
+        <Text
+          style={[styles.greetingText, { color: C.primary }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          maxFontSizeMultiplier={1.2}
+        >
+          {greeting}
+        </Text>
       </View>
 
       {/* ── Search (fixo) ──────────────────────────────────────────────── */}
@@ -693,7 +711,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingBottom: 14,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.18,
+        shadowRadius: 10,
+      },
+      android: { elevation: 8 },
+    }),
   },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   logoIcon: {
@@ -702,19 +729,17 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
-  logoText: { fontSize: 18, fontWeight: '800' },
+  logoText: { fontSize: 18, fontWeight: '800', color: '#fff' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   iconBtn: {
     width: 42,
     height: 42,
-    borderRadius: 13,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 2,
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
   avatarBtn: {},
   avatarInner: {
@@ -727,9 +752,9 @@ const styles = StyleSheet.create({
   avatarInitial: { fontSize: 17, fontWeight: '800' },
 
   // Greeting
-  greetingSection: { paddingHorizontal: 20, paddingTop: 6, paddingBottom: 10 },
-  dateSmall: { fontSize: 13, fontWeight: '500', textTransform: 'capitalize' },
-  greetingText: { fontSize: 30, fontWeight: '800', marginTop: 2 },
+  greetingSection: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12 },
+  dateSmall: { fontSize: 13, fontWeight: '500', lineHeight: 18, textTransform: 'capitalize' },
+  greetingText: { fontSize: 30, fontWeight: '800', lineHeight: 40, marginTop: 2 },
 
   // Search
   searchWrap: {

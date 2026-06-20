@@ -147,20 +147,6 @@ export default function OnboardingScreen() {
             onScrollToIndexFailed={() => {}}
           />
 
-          {/* Dots */}
-          <View style={styles.dots}>
-            {SLIDES.map((s, i) => (
-              <View
-                key={s.key}
-                style={[
-                  styles.dot,
-                  { backgroundColor: i === current ? C.primary : C.border },
-                  i === current && styles.dotActive,
-                ]}
-              />
-            ))}
-          </View>
-
           {/* Navegação */}
           <View style={[styles.nav, { paddingBottom: insets.bottom + 24 }]}>
             {isLast ? (
@@ -286,11 +272,6 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   skipText: { fontSize: 14, fontWeight: '600' },
-
-  // Dots (top area)
-  dots: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 8 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  dotActive: { width: 24 },
 
   // Nav row
   nav: { paddingHorizontal: 28 },

@@ -1,6 +1,7 @@
 import { MedicineCardSkeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/Button';
-import { IconButton } from '@/components/ui/IconButton';
+
+import { ScreenHeader, headerBtnStyle } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/hooks/use-theme';
 import { deleteMedicine, getMedicines } from '@/lib/database';
@@ -21,7 +22,6 @@ import {
   View,
   type SectionListRenderItemInfo,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TYPE_ICONS: Record<MedicineType, string> = {
   capsule: 'ellipse',
@@ -158,7 +158,6 @@ export default function MedicinesScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const C = useTheme();
-  const insets = useSafeAreaInsets();
   const dbReady = useAppStore(s => s.dbReady);
   const router = useRouter();
   const qc = useQueryClient();
@@ -298,68 +297,62 @@ export default function MedicinesScreen() {
   return (
     <View style={[styles.container, { backgroundColor: C.bg }]}>
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <View
-        style={[
-          styles.header,
-          { paddingTop: insets.top + 12, backgroundColor: C.card, borderBottomColor: C.border },
-        ]}
-      >
-        {selectionMode ? (
-          <>
-            <IconButton
-              name="close"
-              variant="ghost"
-              size={22}
-              boxSize={38}
+      {selectionMode ? (
+        <ScreenHeader
+          title={`${selectedIds.size} selecionado${selectedIds.size !== 1 ? 's' : ''}`}
+          left={
+            <TouchableOpacity
+              style={headerBtnStyle.iconOnly}
               onPress={exitSelectionMode}
               accessibilityLabel="Cancelar seleção"
-            />
-            <Text variant="title">
-              {selectedIds.size} selecionado{selectedIds.size !== 1 ? 's' : ''}
-            </Text>
+            >
+              <Ionicons name="close" size={22} color="#fff" />
+            </TouchableOpacity>
+          }
+          right={
             <View style={styles.headerActions}>
               <TouchableOpacity
                 onPress={toggleSelectAll}
-                style={[styles.selectionBtn, { backgroundColor: C.primary + '18' }]}
+                style={headerBtnStyle.btn}
                 accessibilityLabel={allSelected ? 'Desmarcar todos' : 'Selecionar todos'}
                 accessibilityRole="button"
               >
                 <Ionicons
                   name={allSelected ? 'checkbox' : 'checkbox-outline'}
-                  size={18}
-                  color={C.primary}
+                  size={16}
+                  color="#fff"
                 />
-                <Text variant="label" color={C.primary}>
+                <Text variant="label" color="#fff">
                   {allSelected ? 'Desmarcar' : 'Todos'}
                 </Text>
               </TouchableOpacity>
-              <Button
-                variant="danger"
-                size="sm"
-                icon={<Ionicons name="trash-outline" size={14} color="#fff" />}
+              <TouchableOpacity
                 onPress={confirmDeleteSelected}
+                style={[headerBtnStyle.btn, { backgroundColor: 'rgba(231,76,60,0.8)' }]}
                 disabled={selectedIds.size === 0}
+                accessibilityLabel="Excluir selecionados"
+                accessibilityRole="button"
               >
-                Excluir
-              </Button>
-            </View>
-          </>
-        ) : (
-          <>
-            <View>
-              <Text variant="heading">Remédios</Text>
-              {medicines.length > 0 && (
-                <Text variant="caption" color={C.sub}>
-                  {medicines.length} cadastrado{medicines.length !== 1 ? 's' : ''}
+                <Ionicons name="trash-outline" size={14} color="#fff" />
+                <Text variant="label" color="#fff">
+                  Excluir
                 </Text>
-              )}
+              </TouchableOpacity>
             </View>
+          }
+        />
+      ) : (
+        <ScreenHeader
+          title="Remédios"
+          subtitle={
+            medicines.length > 0
+              ? `${medicines.length} cadastrado${medicines.length !== 1 ? 's' : ''}`
+              : undefined
+          }
+          right={
             <View style={styles.headerActions}>
-              <IconButton
-                name="scan-outline"
-                variant="primary"
-                size={20}
-                boxSize={40}
+              <TouchableOpacity
+                style={headerBtnStyle.iconOnly}
                 onPress={() =>
                   Alert.alert('Escanear com IA', 'O que você quer fotografar?', [
                     {
@@ -374,9 +367,12 @@ export default function MedicinesScreen() {
                   ])
                 }
                 accessibilityLabel="Escanear com IA"
-              />
+                accessibilityRole="button"
+              >
+                <Ionicons name="scan-outline" size={20} color="#fff" />
+              </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.addBtn, { backgroundColor: C.primary }]}
+                style={headerBtnStyle.iconOnly}
                 onPress={() => router.push('/add-medicine' as never)}
                 accessibilityLabel="Adicionar medicamento"
                 accessibilityRole="button"
@@ -384,9 +380,9 @@ export default function MedicinesScreen() {
                 <Ionicons name="add" size={22} color="#fff" />
               </TouchableOpacity>
             </View>
-          </>
-        )}
-      </View>
+          }
+        />
+      )}
 
       {/* ── Search ─────────────────────────────────────────────────────────── */}
       {!selectionMode && (
@@ -473,23 +469,7 @@ export default function MedicinesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  // Header
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  addBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   selectionBtn: {
     flexDirection: 'row',
     alignItems: 'center',

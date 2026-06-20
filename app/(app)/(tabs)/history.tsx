@@ -7,7 +7,6 @@ import {
   Alert,
   type SectionListRenderItemInfo,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -16,6 +15,7 @@ import { getWeekAdherence, getRecentHistory } from '@/lib/database';
 import { generateAdherenceReport } from '@/lib/report';
 import { useAppStore } from '@/lib/store';
 import { useTheme } from '@/hooks/use-theme';
+import { ScreenHeader, headerBtnStyle } from '@/components/ui/ScreenHeader';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
@@ -151,7 +151,6 @@ function HistoryItem({ item }: Readonly<{ item: Dose }>) {
 
 export default function HistoryScreen() {
   const C = useTheme();
-  const insets = useSafeAreaInsets();
   const dbReady = useAppStore(s => s.dbReady);
   const [exporting, setExporting] = useState(false);
 
@@ -195,7 +194,6 @@ export default function HistoryScreen() {
   );
 
   const renderSectionHeader = useCallback(
-     
     ({ section }: { section: any }) => (
       <View style={[styles.sectionHeader, { backgroundColor: C.bg }]}>
         <Text variant="caption" color={C.sub} style={styles.sectionLabel}>
@@ -332,36 +330,31 @@ export default function HistoryScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: C.bg }]}>
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <View
-        style={[
-          styles.header,
-          { paddingTop: insets.top + 12, backgroundColor: C.card, borderBottomColor: C.border },
-        ]}
-      >
-        <Text variant="heading">Histórico</Text>
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Exportar PDF"
-          activeOpacity={0.8}
-          disabled={exporting || loadingHistory || loadingAdherence}
-          onPress={handleExportPdf}
-          style={[
-            styles.exportBtn,
-            { backgroundColor: C.primary },
-            (exporting || loadingHistory || loadingAdherence) && { opacity: 0.6 },
-          ]}
-        >
-          <Ionicons
-            name={exporting ? 'hourglass-outline' : 'download-outline'}
-            size={16}
-            color="#fff"
-          />
-          <Text variant="label" color="#fff">
-            {exporting ? 'Gerando...' : 'Exportar PDF'}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title="Histórico"
+        right={
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Exportar PDF"
+            activeOpacity={0.8}
+            disabled={exporting || loadingHistory || loadingAdherence}
+            onPress={handleExportPdf}
+            style={[
+              headerBtnStyle.btn,
+              (exporting || loadingHistory || loadingAdherence) && { opacity: 0.6 },
+            ]}
+          >
+            <Ionicons
+              name={exporting ? 'hourglass-outline' : 'download-outline'}
+              size={16}
+              color="#fff"
+            />
+            <Text variant="label" color="#fff">
+              {exporting ? 'Gerando...' : 'Exportar PDF'}
+            </Text>
+          </TouchableOpacity>
+        }
+      />
 
       {/* ── List ────────────────────────────────────────────────────────────── */}
       <SectionList
@@ -403,24 +396,6 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  exportBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
 
   // List
   listContent: { paddingBottom: 100 },

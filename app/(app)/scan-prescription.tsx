@@ -5,6 +5,7 @@ import {
   generateDosesForSchedule,
   getDosesForDate,
   updateDoseNotificationId,
+  updateDoseStatus,
 } from '@/lib/database';
 import { scheduleDoseNotification } from '@/lib/notifications';
 import { scanPrescription, type PrescriptionData } from '@/lib/prescription-scanner';
@@ -66,15 +67,33 @@ function addDays(dateStr: string, days: number): string {
  * Maps time hint words extracted from the prescription to concrete HH:MM times.
  * Falls back to timesPerDay-based defaults when no hints match.
  */
+function anchorForInterval(frequencyHours: number): string {
+  if (frequencyHours <= 4) return '06:00';
+  if (frequencyHours <= 6) return '06:00';
+  if (frequencyHours <= 8) return '08:00';
+  if (frequencyHours <= 12) return '08:00';
+  return '08:00';
+}
+
+function smartStartDate(times: string[]): string {
+  const today = todayStr();
+  const now = new Date();
+  const allPassed = times.every(t => {
+    const [h, m] = t.split(':').map(Number);
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d <= now;
+  });
+  return allPassed ? addDays(today, 1) : today;
+}
+
 function timeHintsToSchedule(
   hints: string[],
   timesPerDay: number | null | undefined,
   frequencyHours: number | null | undefined
 ): string[] {
   if (frequencyHours) {
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return [`${pad(now.getHours())}:${pad(now.getMinutes())}`];
+    return [anchorForInterval(frequencyHours)];
   }
 
   const HINT_MAP: Record<string, string> = {
@@ -117,6 +136,7 @@ function timeHintsToSchedule(
 interface ConfirmState {
   item: PrescriptionData;
   times: string[];
+  startDate: string;
   durationDays: string;
   isContinuous: boolean;
   dosage: string;
@@ -334,6 +354,21 @@ function ConfirmModal({
 
             {!isSos && (
               <>
+                <View
+                  style={[
+                    modalStyles.section,
+                    modalStyles.startDateRow,
+                    { backgroundColor: C.primary + '12', borderColor: C.primary + '33' },
+                  ]}
+                >
+                  <Ionicons name="calendar-outline" size={16} color={C.primary} />
+                  <Text variant="caption" color={C.primary}>
+                    {state.startDate === todayStr()
+                      ? `Primeira dose hoje às ${times[0]}`
+                      : `Primeira dose amanhã às ${times[0]} — horários de hoje já passaram`}
+                  </Text>
+                </View>
+
                 <View style={modalStyles.section}>
                   <Text variant="caption" color={C.sub} style={modalStyles.sectionLabel}>
                     Horários de lembrete
@@ -445,6 +480,15 @@ const modalStyles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   saveBtn: { marginTop: 8 },
+  startDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 4,
+  },
   sosBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -636,6 +680,7 @@ export default function ScanPrescriptionScreen() {
     setConfirmState({
       item,
       times: suggestedTimes,
+      startDate: smartStartDate(suggestedTimes),
       durationDays: item.durationDays ? String(item.durationDays) : '',
       isContinuous: item.isContinuous ?? !item.durationDays,
       dosage: item.instructions ?? 'Conforme receita',
@@ -659,7 +704,7 @@ export default function ScanPrescriptionScreen() {
       });
 
       if (!isSos) {
-        const today = todayStr();
+        const today = state.startDate;
         const parsedDuration = Number.parseInt(durationDays);
         const endDate =
           !isContinuous && !Number.isNaN(parsedDuration) && parsedDuration > 0
@@ -694,7 +739,16 @@ export default function ScanPrescriptionScreen() {
 
         await generateDosesForSchedule(schedule, 30);
 
+        // Marca como skipped doses já passadas no dia de hoje para evitar status "atrasado" imediato
         const now = new Date();
+        const realToday = todayStr();
+        const todayDoses = await getDosesForDate(realToday);
+        for (const dose of todayDoses) {
+          if (dose.scheduleId === schedule.id && new Date(dose.scheduledTime) <= now) {
+            await updateDoseStatus(dose.id, 'skipped');
+          }
+        }
+
         for (let i = 0; i < 7; i++) {
           const d = new Date(now);
           d.setDate(d.getDate() + i);

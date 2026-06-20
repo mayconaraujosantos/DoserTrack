@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ActivityIndicator,
 } from 'react-native';
@@ -24,9 +26,10 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState(__DEV__ ? 'mv.maycon.araujo.santos@gmail.com' : '');
+  const [password, setPassword] = useState(__DEV__ ? 'MAYkon1616' : '');
   const [showPassword, setShowPassword] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,7 +41,7 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       await signIn(email.trim().toLowerCase(), password);
-      router.replace('/(tabs)');
+      router.replace('/');
     } catch (e: any) {
       setError(mapAuthError(e));
     } finally {
@@ -51,7 +54,7 @@ export default function LoginScreen() {
       style={[styles.root, { backgroundColor: C.bg, paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.inner}>
+      <Pressable style={styles.inner} onPress={Keyboard.dismiss}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: C.text }]}>Acesse sua conta</Text>
@@ -76,6 +79,12 @@ export default function LoginScreen() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              autoComplete="email"
+              textContentType="emailAddress"
+              spellCheck={false}
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              submitBehavior="submit"
               editable={!loading}
             />
           </View>
@@ -89,6 +98,7 @@ export default function LoginScreen() {
             </View>
             <View style={[styles.inputWrap, { backgroundColor: C.card, borderColor: C.border }]}>
               <TextInput
+                ref={passwordRef}
                 style={[styles.inputInner, { color: C.text }]}
                 placeholder="••••••••"
                 placeholderTextColor={C.sub}
@@ -97,6 +107,9 @@ export default function LoginScreen() {
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
                 autoCorrect={false}
+                autoComplete="current-password"
+                textContentType="password"
+                returnKeyType="done"
                 editable={!loading}
                 onSubmitEditing={handleLogin}
               />
@@ -145,7 +158,7 @@ export default function LoginScreen() {
             <Text style={[styles.footerLink, { color: C.primary }]}>Criar conta</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </Pressable>
     </KeyboardAvoidingView>
   );
 }

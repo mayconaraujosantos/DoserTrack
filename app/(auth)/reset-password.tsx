@@ -45,7 +45,7 @@ export default function ResetPasswordScreen() {
     setLoading(true);
     try {
       await updatePassword(password);
-      router.replace('/(tabs)');
+      router.replace('/login');
     } catch (e: any) {
       setError(mapAuthError(e));
     } finally {
