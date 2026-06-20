@@ -14,6 +14,10 @@ export async function markOnboardingDone(): Promise<void> {
   await SecureStore.setItemAsync(KEYS.onboarding, 'true');
 }
 
+export async function clearOnboardingFlag(): Promise<void> {
+  await SecureStore.deleteItemAsync(KEYS.onboarding);
+}
+
 export async function getStoredActiveProfileId(): Promise<number | null> {
   const val = await SecureStore.getItemAsync(KEYS.activeProfileId);
   if (!val) return null;
