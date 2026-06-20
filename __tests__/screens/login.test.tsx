@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, fireEvent, waitFor, screen } from '@testing-library/react-native';
 import { useRouter } from 'expo-router';
-import LoginScreen from '@/app/login';
+import LoginScreen from '@/app/(auth)/login';
 import * as auth from '@/lib/auth';
 
 jest.mock('@/lib/auth', () => ({
@@ -54,7 +54,7 @@ describe('LoginScreen', () => {
     });
   });
 
-  it('navega para /(tabs) quando login é bem-sucedido', async () => {
+  it('navega para / quando login é bem-sucedido', async () => {
     (auth.signIn as jest.Mock).mockResolvedValueOnce({
       id: 'uid-1',
       email: 'user@test.com',
@@ -67,7 +67,7 @@ describe('LoginScreen', () => {
     fireEvent.press(screen.getByTestId('btn-login'));
 
     await waitFor(() => {
-      expect(mockRouter.replace).toHaveBeenCalledWith('/(tabs)');
+      expect(mockRouter.replace).toHaveBeenCalledWith('/');
     });
   });
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, fireEvent, waitFor, screen } from '@testing-library/react-native';
 import { useRouter } from 'expo-router';
-import RegisterScreen from '@/app/register';
+import RegisterScreen from '@/app/(auth)/register';
 import * as auth from '@/lib/auth';
 
 jest.mock('@/lib/auth', () => ({
@@ -75,7 +75,7 @@ describe('RegisterScreen', () => {
     });
   });
 
-  it('navega para /(tabs) quando cadastro é bem-sucedido', async () => {
+  it('navega para /complete-profile quando cadastro é bem-sucedido', async () => {
     (auth.signUp as jest.Mock).mockResolvedValueOnce({
       id: 'uid-1',
       email: 'novo@test.com',
@@ -90,7 +90,7 @@ describe('RegisterScreen', () => {
     fireEvent.press(screen.getByTestId('btn-register'));
 
     await waitFor(() => {
-      expect(mockRouter.replace).toHaveBeenCalledWith('/(tabs)');
+      expect(mockRouter.replace).toHaveBeenCalledWith('/complete-profile');
     });
   });
 

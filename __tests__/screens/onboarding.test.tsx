@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, fireEvent, waitFor, screen, act } from '@testing-library/react-native';
 import { useRouter } from 'expo-router';
-import OnboardingScreen from '@/app/onboarding';
+import OnboardingScreen from '@/app/(auth)/onboarding';
 import * as storage from '@/lib/storage';
 
 const mockRouter = { replace: jest.fn(), push: jest.fn(), back: jest.fn() };

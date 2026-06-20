@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, fireEvent, waitFor, screen } from '@testing-library/react-native';
 import { useRouter } from 'expo-router';
-import ForgotPasswordScreen from '@/app/forgot-password';
+import ForgotPasswordScreen from '@/app/(auth)/forgot-password';
 import * as auth from '@/lib/auth';
 
 jest.mock('@/lib/auth', () => ({

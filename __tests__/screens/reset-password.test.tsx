@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, fireEvent, waitFor, screen } from '@testing-library/react-native';
 import { useRouter } from 'expo-router';
-import ResetPasswordScreen from '@/app/reset-password';
+import ResetPasswordScreen from '@/app/(auth)/reset-password';
 import * as auth from '@/lib/auth';
 
 jest.mock('@/lib/auth', () => ({
@@ -64,7 +64,7 @@ describe('ResetPasswordScreen', () => {
     });
   });
 
-  it('navega para /(tabs) após redefinir com sucesso', async () => {
+  it('navega para /login após redefinir com sucesso', async () => {
     (auth.updatePassword as jest.Mock).mockResolvedValueOnce(undefined);
 
     render(<ResetPasswordScreen />);
@@ -73,7 +73,7 @@ describe('ResetPasswordScreen', () => {
     fireEvent.press(screen.getByTestId('btn-reset'));
 
     await waitFor(() => {
-      expect(mockRouter.replace).toHaveBeenCalledWith('/(tabs)');
+      expect(mockRouter.replace).toHaveBeenCalledWith('/login');
     });
   });
 
