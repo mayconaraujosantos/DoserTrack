@@ -37,11 +37,18 @@ export interface Schedule {
   medicineId: number;
   medicineName?: string;
   dosage: string;
+  doseQuantity: number;
   frequencyConfig: FrequencyConfig;
   startDate: string; // YYYY-MM-DD
   endDate?: string;
   isActive: boolean;
   createdAt: string;
+}
+
+export interface StockProjection {
+  dailyConsumption: number;
+  daysRemaining: number | null;
+  estimatedEndDate: string | null; // YYYY-MM-DD
 }
 
 export type DoseStatus = 'pending' | 'taken' | 'skipped' | 'snoozed';

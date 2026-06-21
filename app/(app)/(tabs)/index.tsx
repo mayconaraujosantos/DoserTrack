@@ -392,6 +392,8 @@ export default function DashboardScreen() {
       haptic.success();
       syncToCloud().catch(console.error);
       qc.invalidateQueries({ queryKey: ['doses'] });
+      qc.invalidateQueries({ queryKey: ['medicines'] });
+      qc.invalidateQueries({ queryKey: ['stock-projections'] });
     },
   });
 
@@ -401,6 +403,8 @@ export default function DashboardScreen() {
       haptic.warning();
       syncToCloud().catch(console.error);
       qc.invalidateQueries({ queryKey: ['doses'] });
+      qc.invalidateQueries({ queryKey: ['medicines'] });
+      qc.invalidateQueries({ queryKey: ['stock-projections'] });
     },
   });
 

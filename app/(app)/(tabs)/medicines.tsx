@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/Button';
 import { ScreenHeader, headerBtnStyle } from '@/components/ui/ScreenHeader';
 import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/hooks/use-theme';
-import { deleteMedicine, getMedicines } from '@/lib/database';
+import { deleteMedicine, getMedicines, getStockProjections } from '@/lib/database';
 import { haptic } from '@/lib/haptics';
 import { useAppStore } from '@/lib/store';
-import type { Medicine, MedicineType } from '@/types';
+import type { Medicine, MedicineType, StockProjection } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -49,8 +49,35 @@ function resolveStockColor(medicine: Medicine, C: ReturnType<typeof useTheme>): 
 
 // ─── MedicineRow ──────────────────────────────────────────────────────────────
 
+const MONTHS_SHORT = [
+  'Jan',
+  'Fev',
+  'Mar',
+  'Abr',
+  'Mai',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Set',
+  'Out',
+  'Nov',
+  'Dez',
+];
+
+function formatEndDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00');
+  return `${d.getDate()}/${MONTHS_SHORT[d.getMonth()]}`;
+}
+
+function projectionColor(daysRemaining: number, C: ReturnType<typeof useTheme>): string {
+  if (daysRemaining <= 3) return C.danger;
+  if (daysRemaining <= 7) return C.warning;
+  return C.sub;
+}
+
 function MedicineRow({
   medicine,
+  projection,
   onDelete,
   onSchedule,
   onEdit,
@@ -60,6 +87,7 @@ function MedicineRow({
   onSelect,
 }: Readonly<{
   medicine: Medicine;
+  projection?: StockProjection;
   onDelete: (id: number) => void;
   onSchedule: (id: number) => void;
   onEdit: (id: number) => void;
@@ -70,6 +98,8 @@ function MedicineRow({
 }>) {
   const C = useTheme();
   const color = resolveStockColor(medicine, C);
+  const projColor =
+    projection?.daysRemaining != null ? projectionColor(projection.daysRemaining, C) : C.sub;
 
   function handlePress() {
     if (selectionMode) onSelect(medicine.id);
@@ -126,6 +156,14 @@ function MedicineRow({
         <Text variant="caption" color={C.sub}>
           {TYPE_LABELS[medicine.type]}
         </Text>
+        {projection?.daysRemaining != null && (
+          <Text variant="caption" color={projColor} style={styles.projectionText}>
+            ~{projection.daysRemaining} dias
+            {projection.estimatedEndDate
+              ? ` · acaba em ${formatEndDate(projection.estimatedEndDate)}`
+              : ''}
+          </Text>
+        )}
       </View>
 
       {!selectionMode && (
@@ -165,6 +203,12 @@ export default function MedicinesScreen() {
   const { data: medicines = [], isLoading } = useQuery({
     queryKey: ['medicines'],
     queryFn: getMedicines,
+    enabled: dbReady,
+  });
+
+  const { data: projections = {} } = useQuery({
+    queryKey: ['stock-projections'],
+    queryFn: getStockProjections,
     enabled: dbReady,
   });
 
@@ -270,6 +314,7 @@ export default function MedicinesScreen() {
     ({ item }: SectionListRenderItemInfo<Medicine>) => (
       <MedicineRow
         medicine={item}
+        projection={projections[item.id]}
         onEdit={id => router.push(`/edit-medicine?id=${id}` as never)}
         onSchedule={id => router.push(`/add-schedule?medicineId=${id}` as never)}
         onDelete={confirmDelete}
@@ -279,7 +324,7 @@ export default function MedicinesScreen() {
         onSelect={toggleSelect}
       />
     ),
-    [confirmDelete, router, selectionMode, selectedIds]
+    [confirmDelete, projections, router, selectionMode, selectedIds]
   );
 
   const renderSectionHeader = useCallback(
@@ -549,6 +594,7 @@ const styles = StyleSheet.create({
   },
   iconPhoto: { width: 46, height: 46, borderRadius: 12 },
   rowInfo: { flex: 1, gap: 2 },
+  projectionText: { fontSize: 11, fontWeight: '500', marginTop: 1 },
 
   // Stock chip
   stockChip: {

@@ -6,6 +6,7 @@ import type {
   MedicineType,
   Profile,
   Schedule,
+  StockProjection,
 } from '@/types';
 import * as SQLite from 'expo-sqlite';
 
@@ -106,6 +107,7 @@ export async function initDatabase() {
   await ensureColumn('medicines', 'updated_at', 'TEXT');
   await ensureColumn('schedules', 'updated_at', 'TEXT');
   await ensureColumn('doses', 'updated_at', 'TEXT');
+  await ensureColumn('schedules', 'dose_quantity', 'REAL NOT NULL DEFAULT 1');
 
   const defaultProfile = await ensureDefaultProfile();
 
@@ -283,12 +285,13 @@ export async function createSchedule(
 ): Promise<Schedule> {
   const profileId = requireActiveProfileId();
   const result = await db.runAsync(
-    `INSERT INTO schedules (profile_id, medicine_id, dosage, frequency_config, start_date, end_date)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO schedules (profile_id, medicine_id, dosage, dose_quantity, frequency_config, start_date, end_date)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
       profileId,
       data.medicineId,
       data.dosage,
+      data.doseQuantity ?? 1,
       JSON.stringify(data.frequencyConfig),
       data.startDate,
       data.endDate ?? null,
@@ -351,10 +354,45 @@ export async function updateDoseStatus(
   skipReason?: string
 ) {
   const profileId = requireActiveProfileId();
+
+  const current = await db.getFirstAsync<{
+    status: string;
+    schedule_id: number;
+    medicine_id: number;
+  }>('SELECT status, schedule_id, medicine_id FROM doses WHERE id = ? AND profile_id = ?', [
+    id,
+    profileId,
+  ]);
+
   await db.runAsync(
     `UPDATE doses SET status = ?, taken_time = ?, skip_reason = ? WHERE id = ? AND profile_id = ?`,
     [status, takenTime ?? null, skipReason ?? null, id, profileId]
   );
+
+  if (current) {
+    const wasTaken = current.status === 'taken';
+    const isTaken = status === 'taken';
+
+    if (wasTaken !== isTaken) {
+      const sched = await db.getFirstAsync<{ dose_quantity: number }>(
+        'SELECT dose_quantity FROM schedules WHERE id = ? AND profile_id = ?',
+        [current.schedule_id, profileId]
+      );
+      const qty = sched?.dose_quantity ?? 1;
+
+      if (isTaken) {
+        await db.runAsync(
+          'UPDATE medicines SET stock_quantity = MAX(0, stock_quantity - ?) WHERE id = ? AND profile_id = ?',
+          [qty, current.medicine_id, profileId]
+        );
+      } else {
+        await db.runAsync(
+          'UPDATE medicines SET stock_quantity = stock_quantity + ? WHERE id = ? AND profile_id = ?',
+          [qty, current.medicine_id, profileId]
+        );
+      }
+    }
+  }
 }
 
 export async function updateDoseNotificationId(id: number, notificationId: string) {
@@ -692,6 +730,69 @@ function toLocalISOString(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
+// --- Stock projections ---
+
+function dailyConsumptionFromConfig(cfg: FrequencyConfig, doseQuantity: number): number {
+  if (cfg.type === 'interval_hours' && cfg.intervalHours) {
+    return (24 / cfg.intervalHours) * doseQuantity;
+  }
+  if (cfg.type === 'specific_days' && cfg.specificDays) {
+    return (cfg.specificDays.length / 7) * cfg.times.length * doseQuantity;
+  }
+  if (cfg.type === 'fixed_cycle' && cfg.daysOn && cfg.daysOff) {
+    return (cfg.daysOn / (cfg.daysOn + cfg.daysOff)) * cfg.times.length * doseQuantity;
+  }
+  return 0;
+}
+
+export async function getStockProjections(): Promise<Record<number, StockProjection>> {
+  const profileId = requireActiveProfileId();
+  const rows = await db.getAllAsync<{
+    medicine_id: number;
+    dose_quantity: number;
+    frequency_config: string;
+    stock_quantity: number;
+  }>(
+    `SELECT s.medicine_id, s.dose_quantity, s.frequency_config, m.stock_quantity
+     FROM schedules s
+     JOIN medicines m ON s.medicine_id = m.id
+     WHERE s.profile_id = ? AND s.is_active = 1`,
+    [profileId]
+  );
+
+  const byMedicine: Record<number, { stockQuantity: number; dailyConsumption: number }> = {};
+  for (const row of rows) {
+    const cfg = JSON.parse(row.frequency_config) as FrequencyConfig;
+    const daily = dailyConsumptionFromConfig(cfg, row.dose_quantity ?? 1);
+    if (!byMedicine[row.medicine_id]) {
+      byMedicine[row.medicine_id] = { stockQuantity: row.stock_quantity, dailyConsumption: 0 };
+    }
+    byMedicine[row.medicine_id].dailyConsumption += daily;
+  }
+
+  const result: Record<number, StockProjection> = {};
+  for (const [idStr, data] of Object.entries(byMedicine)) {
+    const id = Number(idStr);
+    if (data.dailyConsumption === 0 || data.stockQuantity <= 0) {
+      result[id] = {
+        dailyConsumption: data.dailyConsumption,
+        daysRemaining: null,
+        estimatedEndDate: null,
+      };
+    } else {
+      const daysRemaining = Math.floor(data.stockQuantity / data.dailyConsumption);
+      const end = new Date();
+      end.setDate(end.getDate() + daysRemaining);
+      result[id] = {
+        dailyConsumption: data.dailyConsumption,
+        daysRemaining,
+        estimatedEndDate: end.toISOString().slice(0, 10),
+      };
+    }
+  }
+  return result;
+}
+
 // --- Row mappers ---
 
 function rowToProfile(row: Record<string, unknown>): Profile {
@@ -725,6 +826,7 @@ function rowToSchedule(row: Record<string, unknown>): Schedule {
     medicineId: row.medicine_id as number,
     medicineName: (row.medicine_name as string | null) ?? undefined,
     dosage: row.dosage as string,
+    doseQuantity: (row.dose_quantity as number | null) ?? 1,
     frequencyConfig: JSON.parse(row.frequency_config as string) as FrequencyConfig,
     startDate: row.start_date as string,
     endDate: (row.end_date as string | null) ?? undefined,

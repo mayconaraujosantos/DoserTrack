@@ -105,6 +105,7 @@ export default function AddScheduleScreen() {
   const { medicineId } = useLocalSearchParams<{ medicineId: string }>();
   const [selectedMedId, setSelectedMedId] = useState(medicineId ? Number.parseInt(medicineId) : 0);
   const [dosage, setDosage] = useState('');
+  const [doseQuantity, setDoseQuantity] = useState('1');
   const [freqType, setFreqType] = useState<FrequencyType>('specific_days');
   const [intervalHours, setIntervalHours] = useState('8');
   const [specificDays, setSpecificDays] = useState<number[]>([1, 2, 3, 4, 5]);
@@ -137,6 +138,7 @@ export default function AddScheduleScreen() {
       const schedule = await createSchedule({
         medicineId: selectedMedId,
         dosage: dosage.trim(),
+        doseQuantity: Math.max(0.01, Number.parseFloat(doseQuantity) || 1),
         frequencyConfig: buildFreqConfig(),
         startDate,
         endDate: endDate || undefined,
@@ -260,6 +262,22 @@ export default function AddScheduleScreen() {
             onChangeText={setDosage}
             style={styles.flex}
           />
+        </View>
+        <View style={[styles.sectionDivider, { backgroundColor: C.border }]} />
+        <View style={styles.inlineRow}>
+          <Text variant="body" color={C.text}>
+            Desconta
+          </Text>
+          <Input
+            placeholder="1"
+            keyboardType="decimal-pad"
+            value={doseQuantity}
+            onChangeText={setDoseQuantity}
+            style={styles.shortInput}
+          />
+          <Text variant="body" color={C.text}>
+            {selectedMed?.stockUnit ?? 'unidade(s)'} do estoque por dose
+          </Text>
         </View>
       </FormSection>
 
