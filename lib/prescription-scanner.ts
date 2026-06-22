@@ -38,11 +38,14 @@ export async function scanPrescription(base64Image: string): Promise<Prescriptio
   });
 
   if (error) {
-    console.error('[Scanner] Erro na Edge Function:', error);
     let message = error.message ?? 'Não foi possível analisar a receita. Tente novamente.';
     if ('context' in error && error.context instanceof Response) {
-      const body = await (error.context as Response).json().catch(() => ({}));
+      const res = error.context as Response;
+      const body = await res.json().catch(() => ({}));
+      console.error('[Scanner] Erro HTTP', res.status, body);
       if (body?.error) message = body.error as string;
+    } else {
+      console.error('[Scanner] Erro na Edge Function:', error);
     }
     throw new Error(message);
   }

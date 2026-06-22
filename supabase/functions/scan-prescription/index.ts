@@ -93,6 +93,7 @@ Deno.serve(async (req: Request) => {
       generationConfig: {
         maxOutputTokens: 2048,
         temperature: 0.1,
+        responseMimeType: 'application/json',
       },
     };
 
@@ -126,9 +127,30 @@ Deno.serve(async (req: Request) => {
       .replace(/\s*```$/, '')
       .trim();
 
-    const parsed = JSON.parse(text);
+    if (!text) {
+      return new Response(
+        JSON.stringify({ error: 'A IA não retornou resposta. Verifique se a imagem está nítida.' }),
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    if (!Array.isArray(parsed) && parsed?.error === 'not_a_prescription') {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      console.error('[scan-prescription] JSON inválido retornado pelo Gemini:', text.slice(0, 300));
+      return new Response(
+        JSON.stringify({
+          error: 'Não foi possível interpretar a resposta da IA. Tente com uma foto mais nítida.',
+        }),
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (
+      !Array.isArray(parsed) &&
+      (parsed as Record<string, unknown>)?.error === 'not_a_prescription'
+    ) {
       return new Response(
         JSON.stringify({
           error:
