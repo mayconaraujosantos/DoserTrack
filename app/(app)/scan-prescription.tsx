@@ -9,6 +9,7 @@ import {
 } from '@/lib/database';
 import { scheduleDoseNotification } from '@/lib/notifications';
 import { scanPrescription, type PrescriptionData } from '@/lib/prescription-scanner';
+import { getCachedPrescription, cachePrescription, clearPrescriptionCache } from '@/lib/scan-cache';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useQueryClient } from '@tanstack/react-query';
@@ -615,6 +616,7 @@ export default function ScanPrescriptionScreen() {
   const [imageBase64, setImageBase64] = useState<string | undefined>();
   const [scanning, setScanning] = useState(false);
   const [results, setResults] = useState<SavedPrescriptionData[]>([]);
+  const [fromCache, setFromCache] = useState(false);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
 
@@ -661,8 +663,16 @@ export default function ScanPrescriptionScreen() {
     if (!imageBase64) return;
     setScanning(true);
     setResults([]);
+    setFromCache(false);
     try {
+      const cached = await getCachedPrescription(imageBase64);
+      if (cached) {
+        setResults(cached);
+        setFromCache(true);
+        return;
+      }
       const data = await scanPrescription(imageBase64);
+      await cachePrescription(imageBase64, data);
       setResults(data);
     } catch (err) {
       Alert.alert('Erro ao analisar', err instanceof Error ? err.message : 'Tente novamente.');
@@ -784,6 +794,7 @@ export default function ScanPrescriptionScreen() {
 
   function reset() {
     setResults([]);
+    setFromCache(false);
     setImageUri(undefined);
     setImageBase64(undefined);
   }
@@ -867,10 +878,34 @@ export default function ScanPrescriptionScreen() {
           <>
             <View style={styles.resultsHeader}>
               <Ionicons name="checkmark-circle" size={20} color={C.success} />
-              <Text variant="label">
+              <Text variant="label" style={{ flex: 1 }}>
                 {results.length} medicamento{results.length > 1 ? 's' : ''} encontrado
                 {results.length > 1 ? 's' : ''}
               </Text>
+              {fromCache && (
+                <View
+                  style={[
+                    styles.cacheBadge,
+                    { backgroundColor: C.primary + '18', borderColor: C.primary + '44' },
+                  ]}
+                >
+                  <Ionicons name="flash" size={11} color={C.primary} />
+                  <Text variant="caption" color={C.primary} style={styles.cacheBadgeText}>
+                    Do cache
+                  </Text>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      await clearPrescriptionCache();
+                      setFromCache(false);
+                      setResults([]);
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Ignorar cache e reanalisar"
+                  >
+                    <Ionicons name="refresh" size={12} color={C.primary} />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
             {results.map((item, index) => (
@@ -929,6 +964,16 @@ const styles = StyleSheet.create({
   },
   analyzeBtn: {},
   resultsHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cacheBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  cacheBadgeText: { fontSize: 11 },
   resultCard: { gap: 8 },
   resultHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   resultBadge: {
