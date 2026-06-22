@@ -57,7 +57,7 @@ export async function scanPrescription(base64Image: string): Promise<Prescriptio
 
   const medications = data?.medications as PrescriptionData[] | undefined;
   if (!Array.isArray(medications)) {
-    throw new Error(
+    throw new TypeError(
       'Não foi possível interpretar a receita. Verifique se a imagem está legível e tente novamente.'
     );
   }
