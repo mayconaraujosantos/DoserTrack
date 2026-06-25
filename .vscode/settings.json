@@ -5,5 +5,9 @@
     "source.sortMembers": "explicit"
   },
   "supabase.projectPath": ".",
-  "supabase.apiPort": 54321
+  "supabase.apiPort": 54321,
+  "sonarlint.connectedMode.project": {
+    "connectionId": "mayconaraujosantos",
+    "projectKey": "mayconaraujosantos_DoserTrack"
+  }
 }
