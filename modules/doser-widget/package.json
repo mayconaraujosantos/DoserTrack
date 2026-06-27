@@ -1,0 +1,15 @@
+{
+  "name": "doser-widget",
+  "version": "1.0.0",
+  "description": "Native widget bridge for Doser app",
+  "main": "build/index.js",
+  "types": "build/index.d.ts",
+  "scripts": {
+    "build": "expo-module build"
+  },
+  "dependencies": {},
+  "peerDependencies": {
+    "expo": "*",
+    "expo-modules-core": "*"
+  }
+}

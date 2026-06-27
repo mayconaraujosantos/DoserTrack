@@ -354,6 +354,9 @@ export async function updateDoseStatus(
   skipReason?: string
 ) {
   const profileId = requireActiveProfileId();
+  // fire-and-forget after write (import is lazy to avoid circular deps)
+  const scheduleWidgetUpdate = () =>
+    import('@/lib/widget-bridge').then(m => m.updateWidgetData()).catch(() => {});
 
   const current = await db.getFirstAsync<{
     status: string;
@@ -393,6 +396,8 @@ export async function updateDoseStatus(
       }
     }
   }
+
+  scheduleWidgetUpdate();
 }
 
 export async function updateDoseNotificationId(id: number, notificationId: string) {

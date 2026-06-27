@@ -46,7 +46,8 @@
       ],
       "expo-sqlite",
       "expo-notifications",
-      "expo-image-picker"
+      "expo-image-picker",
+      "./plugins/withDoserWidget.js"
     ],
     "experiments": {
       "typedRoutes": true,

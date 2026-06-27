@@ -53,6 +53,22 @@ export interface StockProjection {
 
 export type DoseStatus = 'pending' | 'taken' | 'skipped' | 'snoozed';
 
+export interface WidgetDose {
+  id: number;
+  medicineName: string;
+  dosage: string;
+  scheduledTime: string;
+  status: DoseStatus;
+}
+
+export interface WidgetPayload {
+  profileId: number;
+  profileName: string;
+  date: string; // YYYY-MM-DD
+  doses: WidgetDose[];
+  updatedAt: string; // ISO datetime
+}
+
 export interface Dose {
   id: number;
   profileId: number;
