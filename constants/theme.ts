@@ -11,6 +11,8 @@ export const Colors = {
     text: '#000000',
     sub: '#888888',
     border: '#E8EBED',
+    navDark: '#1E1B4B',
+    navAction: '#0D0B2E',
     // react-navigation compatibility
     background: '#F2F8FF',
     tint: '#5D54FF',
@@ -29,6 +31,8 @@ export const Colors = {
     text: '#E2E8F0',
     sub: '#8899A6',
     border: '#253047',
+    navDark: '#0E0C2B',
+    navAction: '#05040F',
     // react-navigation compatibility
     background: '#0F1117',
     tint: '#7B74FF',

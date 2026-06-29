@@ -1,4 +1,5 @@
 import { useTheme } from '@/hooks/use-theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   getDoseById,
   getDosesForDate,
@@ -61,6 +62,7 @@ export default function EditDoseScreen() {
   const doseId = Number.parseInt(id ?? '0');
 
   const C = useTheme();
+  const insets = useSafeAreaInsets();
   const dbReady = useAppStore(s => s.dbReady);
   const router = useRouter();
   const qc = useQueryClient();
@@ -163,7 +165,7 @@ export default function EditDoseScreen() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: C.bg }]}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom + 32, 48) }]}
       keyboardShouldPersistTaps="handled"
     >
       <Card variant="outlined" style={styles.infoCard}>

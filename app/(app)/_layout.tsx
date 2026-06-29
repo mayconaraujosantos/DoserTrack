@@ -170,10 +170,7 @@ export default function AppLayout() {
         name="scan-medicine"
         options={{ presentation: 'modal', title: 'Escanear Embalagem' }}
       />
-      <Stack.Screen
-        name="add-medicine"
-        options={{ presentation: 'modal', title: 'Novo Medicamento' }}
-      />
+      <Stack.Screen name="add-medicine" options={{ headerShown: false }} />
       <Stack.Screen
         name="edit-medicine"
         options={{ presentation: 'modal', title: 'Editar Medicamento' }}

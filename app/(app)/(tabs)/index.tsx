@@ -9,7 +9,7 @@ import type { Dose } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Image,
   Platform,
@@ -26,6 +26,7 @@ import Animated, {
   useSharedValue,
   withSequence,
   withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -295,6 +296,144 @@ function DayCell({
         </View>
       </Animated.View>
     </TouchableOpacity>
+  );
+}
+
+// ─── EmptyDoses ───────────────────────────────────────────────────────────────
+
+type EmptyDosesProps = {
+  C: HomeColors;
+  theme: ReturnType<typeof useTheme>;
+  onScanRx: () => void;
+  onAddMed: () => void;
+  onAddSched: () => void;
+};
+
+function EmptyDoses({ C, theme, onScanRx, onAddMed, onAddSched }: EmptyDosesProps) {
+  const opacity = useSharedValue(0);
+  const slideY = useSharedValue(28);
+
+  useEffect(() => {
+    opacity.value = withTiming(1, { duration: 380 });
+    slideY.value = withSpring(0, { damping: 18, stiffness: 180 });
+  }, [opacity, slideY]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: slideY.value }],
+  }));
+
+  const ACTIONS = [
+    {
+      key: 'rx',
+      icon: 'scan-outline' as const,
+      label: 'Escanear receita',
+      sub: 'Importe direto do seu médico',
+      onPress: onScanRx,
+      primary: true,
+      color: theme.primary,
+    },
+    {
+      key: 'med',
+      icon: 'add-circle-outline' as const,
+      label: 'Adicionar remédio',
+      sub: 'Cadastro manual',
+      onPress: onAddMed,
+      primary: false,
+      color: theme.success,
+    },
+    {
+      key: 'sched',
+      icon: 'alarm-outline' as const,
+      label: 'Criar agendamento',
+      sub: 'Já tem remédio cadastrado?',
+      onPress: onAddSched,
+      primary: false,
+      color: theme.warning,
+    },
+  ];
+
+  return (
+    <Animated.View style={[es.container, animStyle]}>
+      {/* Ilustração com 3 bolhas */}
+      <View style={es.ilRow}>
+        <View style={[es.ilBubble, { backgroundColor: theme.primary + '1A' }]}>
+          <Ionicons name="medical" size={26} color={theme.primary} />
+        </View>
+        <View
+          style={[
+            es.ilBubbleMain,
+            { backgroundColor: theme.primary + '22', borderColor: C.border },
+          ]}
+        >
+          <Ionicons name="medkit-outline" size={38} color={theme.primary} />
+        </View>
+        <View style={[es.ilBubble, { backgroundColor: theme.success + '1A' }]}>
+          <Ionicons name="time-outline" size={26} color={theme.success} />
+        </View>
+      </View>
+
+      <Text style={[es.heading, { color: C.primary }]}>Sem doses para hoje</Text>
+      <Text style={[es.sub, { color: C.sub }]}>
+        Adicione seus medicamentos e configure{'\n'}os horários de dose
+      </Text>
+
+      {/* Lista de ações */}
+      <View style={es.actions}>
+        {ACTIONS.map(action => (
+          <TouchableOpacity
+            key={action.key}
+            style={[
+              es.actionRow,
+              action.primary
+                ? { backgroundColor: theme.navDark }
+                : {
+                    backgroundColor: C.card,
+                    shadowColor: C.primary,
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.07,
+                    shadowRadius: 8,
+                    elevation: 2,
+                  },
+            ]}
+            onPress={action.onPress}
+            activeOpacity={0.82}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+          >
+            <View
+              style={[
+                es.actionIcon,
+                {
+                  backgroundColor: action.primary ? 'rgba(255,255,255,0.15)' : action.color + '22',
+                },
+              ]}
+            >
+              <Ionicons
+                name={action.icon}
+                size={22}
+                color={action.primary ? '#FFFFFF' : action.color}
+              />
+            </View>
+            <View style={es.actionText}>
+              <Text style={[es.actionLabel, { color: action.primary ? '#FFFFFF' : C.primary }]}>
+                {action.label}
+              </Text>
+              <Text
+                style={[es.actionSub, { color: action.primary ? 'rgba(255,255,255,0.6)' : C.sub }]}
+              >
+                {action.sub}
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={action.primary ? 'rgba(255,255,255,0.5)' : C.sub}
+            />
+          </TouchableOpacity>
+        ))}
+      </View>
+    </Animated.View>
   );
 }
 
@@ -654,21 +793,23 @@ export default function DashboardScreen() {
         }
         contentContainerStyle={styles.timelineContent}
       >
-        {!isLoading && filteredDoses.length === 0 && (
-          <View style={styles.empty}>
-            <Ionicons name="checkmark-circle-outline" size={52} color={C.border} />
-            <Text style={[styles.emptyTitle, { color: C.sub }]}>
-              {search ? 'Nenhum resultado' : 'Sem doses para este dia'}
+        {!isLoading && filteredDoses.length === 0 && search.trim() !== '' && (
+          <View style={styles.emptySearch}>
+            <Ionicons name="search-outline" size={36} color={C.border} />
+            <Text style={[styles.emptySearchText, { color: C.sub }]}>
+              {`Nenhum resultado para "${search}"`}
             </Text>
-            {!search && (
-              <TouchableOpacity
-                style={[styles.emptyAddBtn, { backgroundColor: C.primary }]}
-                onPress={() => router.push('/add-medicine')}
-              >
-                <Text style={[styles.emptyAddText, { color: C.card }]}>Adicionar medicamento</Text>
-              </TouchableOpacity>
-            )}
           </View>
+        )}
+
+        {!isLoading && filteredDoses.length === 0 && search.trim() === '' && (
+          <EmptyDoses
+            C={C}
+            theme={theme}
+            onScanRx={() => router.push('/scan-prescription')}
+            onAddMed={() => router.push('/add-medicine')}
+            onAddSched={() => router.push('/add-schedule')}
+          />
         )}
 
         {filteredDoses.map((dose, index) => {
@@ -924,14 +1065,83 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 11, fontWeight: '700' },
   switch: { marginRight: 14 },
 
-  // Empty state
-  empty: { alignItems: 'center', paddingVertical: 44, gap: 12 },
-  emptyTitle: { fontSize: 14, fontWeight: '600' },
-  emptyAddBtn: {
-    paddingHorizontal: 24,
-    paddingVertical: 11,
-    borderRadius: 20,
-    marginTop: 4,
+  // Empty search
+  emptySearch: { alignItems: 'center', paddingVertical: 44, gap: 10 },
+  emptySearchText: { fontSize: 14, fontWeight: '500', textAlign: 'center' },
+});
+
+// ─── EmptyDoses styles ────────────────────────────────────────────────────────
+
+const es = StyleSheet.create({
+  container: {
+    paddingTop: 24,
+    paddingHorizontal: 4,
+    alignItems: 'center',
   },
-  emptyAddText: { fontWeight: '700', fontSize: 14 },
+  // Ilustração
+  ilRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 24,
+  },
+  ilBubble: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ilBubbleMain: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+  },
+  // Texto
+  heading: {
+    fontSize: 22,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  sub: {
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 30,
+  },
+  // Ações
+  actions: {
+    width: '100%',
+    gap: 12,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    padding: 16,
+    gap: 14,
+  },
+  actionIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionText: {
+    flex: 1,
+    gap: 3,
+  },
+  actionLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  actionSub: {
+    fontSize: 13,
+    lineHeight: 17,
+  },
 });

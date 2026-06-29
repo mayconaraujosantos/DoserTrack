@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/Input';
 import { IconButton } from '@/components/ui/IconButton';
 import { Text } from '@/components/ui/Text';
 import type { FrequencyType } from '@/types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
@@ -117,6 +118,7 @@ export default function AddScheduleScreen() {
   const [endDate, setEndDate] = useState('');
 
   const C = useTheme();
+  const insets = useSafeAreaInsets();
   const dbReady = useAppStore(s => s.dbReady);
   const router = useRouter();
   const qc = useQueryClient();
@@ -211,7 +213,7 @@ export default function AddScheduleScreen() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: C.bg }]}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom + 32, 48) }]}
       keyboardShouldPersistTaps="handled"
     >
       {/* ── Medicamento ──────────────────────────────────────────────────────── */}

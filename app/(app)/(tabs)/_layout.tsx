@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { HapticTab } from '@/components/haptic-tab';
-import { useTheme } from '@/hooks/use-theme';
+import { AnimatedTabBar } from '@/components/animated-tab-bar';
+import { QuickActionsSheet } from '@/components/quick-actions-sheet';
 
 type IconProps = Readonly<{ color: string; size: number }>;
 
@@ -19,29 +20,27 @@ function HistoryIcon({ color, size }: IconProps) {
 }
 
 export default function TabLayout() {
-  const C = useTheme();
+  const [showActions, setShowActions] = useState(false);
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: C.primary,
-        tabBarInactiveTintColor: C.sub,
-        tabBarButton: HapticTab,
-        tabBarStyle: {
-          backgroundColor: C.card,
-          borderTopColor: C.border,
-          elevation: 8,
-          shadowColor: '#000',
-          shadowOpacity: 0.08,
-          shadowRadius: 8,
-        },
-        headerShown: false,
-      }}
-    >
-      <Tabs.Screen name="index" options={{ title: 'Hoje', tabBarIcon: TodayIcon }} />
-      <Tabs.Screen name="medicines" options={{ title: 'Remédios', tabBarIcon: MedsIcon }} />
-      <Tabs.Screen name="schedule" options={{ title: 'Agenda', tabBarIcon: ScheduleIcon }} />
-      <Tabs.Screen name="history" options={{ title: 'Histórico', tabBarIcon: HistoryIcon }} />
-    </Tabs>
+    <>
+      <Tabs
+        tabBar={props => <AnimatedTabBar {...props} onActionPress={() => setShowActions(true)} />}
+        screenOptions={{ headerShown: false }}
+      >
+        {/* Abas visíveis na pill */}
+        <Tabs.Screen name="index" options={{ title: 'Hoje', tabBarIcon: TodayIcon }} />
+        <Tabs.Screen name="medicines" options={{ title: 'Remédios', tabBarIcon: MedsIcon }} />
+        <Tabs.Screen name="schedule" options={{ title: 'Agenda', tabBarIcon: ScheduleIcon }} />
+
+        {/* Histórico: acessível via Quick Actions Sheet ou router.push */}
+        <Tabs.Screen
+          name="history"
+          options={{ title: 'Histórico', tabBarIcon: HistoryIcon, href: null }}
+        />
+      </Tabs>
+
+      <QuickActionsSheet visible={showActions} onClose={() => setShowActions(false)} />
+    </>
   );
 }

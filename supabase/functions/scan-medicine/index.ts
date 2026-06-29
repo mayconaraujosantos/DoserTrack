@@ -71,8 +71,10 @@ Deno.serve(async (req: Request) => {
         },
       ],
       generationConfig: {
-        maxOutputTokens: 512,
+        maxOutputTokens: 1024,
         temperature: 0.1,
+        // Desabilita thinking: evita parts com thought:true antes do JSON real
+        thinkingConfig: { thinkingBudget: 0 },
       },
     };
 
@@ -105,17 +107,56 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    type GeminiPart = { text?: string; thought?: boolean };
     const data = (await geminiRes.json()) as {
-      candidates?: { content?: { parts?: { text?: string }[] } }[];
+      candidates?: {
+        content?: { parts?: GeminiPart[] };
+        finishReason?: string;
+      }[];
     };
 
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? '';
+    const candidate = data.candidates?.[0];
+
+    if (candidate?.finishReason === 'SAFETY') {
+      return new Response(
+        JSON.stringify({
+          error: 'A imagem foi bloqueada por filtros de segurança. Tente uma foto diferente.',
+        }),
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Ignora parts de "thinking" (thought: true) — pega o último part com texto real
+    const parts = candidate?.content?.parts ?? [];
+    const textPart = [...parts].reverse().find(p => !p.thought && p.text);
+    const raw = textPart?.text?.trim() ?? '';
+
+    if (!raw) {
+      return new Response(
+        JSON.stringify({
+          error:
+            'A IA não conseguiu extrair informações da imagem. Tente uma foto mais nítida e com boa iluminação.',
+        }),
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const text = raw
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```$/, '')
       .trim();
 
-    const parsed = JSON.parse(text);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return new Response(
+        JSON.stringify({
+          error: 'Não foi possível interpretar a resposta da IA. Tente uma foto mais nítida.',
+        }),
+        { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     if (parsed?.error === 'not_a_medicine') {
       return new Response(
