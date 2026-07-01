@@ -1,6 +1,6 @@
-import { supabase } from '@/lib/supabase';
-import { getDatabase } from '@/lib/database';
+import { getAllRows, runQuery } from '@/lib/database';
 import { logger } from '@/lib/logger';
+import { supabase } from '@/lib/supabase';
 
 const log = logger.make('Sync');
 
@@ -17,9 +17,7 @@ export async function syncToCloud(): Promise<void> {
   const done = log.time('syncToCloud');
   log.info('iniciando sync → cloud, userId:', userId);
 
-  const db = getDatabase();
-
-  const medicines = await db.getAllAsync<Record<string, unknown>>('SELECT * FROM medicines');
+  const medicines = await getAllRows<Record<string, unknown>>('SELECT * FROM medicines');
   if (medicines.length > 0) {
     await supabase.from('medicines').upsert(
       medicines.map(m => ({
@@ -39,7 +37,7 @@ export async function syncToCloud(): Promise<void> {
     );
   }
 
-  const schedules = await db.getAllAsync<Record<string, unknown>>('SELECT * FROM schedules');
+  const schedules = await getAllRows<Record<string, unknown>>('SELECT * FROM schedules');
   if (schedules.length > 0) {
     await supabase.from('schedules').upsert(
       schedules.map(s => ({
@@ -59,7 +57,7 @@ export async function syncToCloud(): Promise<void> {
     );
   }
 
-  const doses = await db.getAllAsync<Record<string, unknown>>('SELECT * FROM doses');
+  const doses = await getAllRows<Record<string, unknown>>('SELECT * FROM doses');
   if (doses.length > 0) {
     await supabase.from('doses').upsert(
       doses.map(d => ({
@@ -89,13 +87,11 @@ export async function pullFromCloud(): Promise<void> {
   const done = log.time('pullFromCloud');
   log.info('iniciando pull ← cloud, userId:', userId);
 
-  const db = getDatabase();
-
   const { data: medicines } = await supabase.from('medicines').select('*').eq('user_id', userId);
 
   if (medicines) {
     for (const m of medicines) {
-      await db.runAsync(
+      await runQuery(
         `INSERT INTO medicines
           (id, profile_id, name, type, stock_quantity, stock_unit, photo_uri, low_stock_threshold, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -125,7 +121,7 @@ export async function pullFromCloud(): Promise<void> {
 
   if (schedules) {
     for (const s of schedules) {
-      await db.runAsync(
+      await runQuery(
         `INSERT INTO schedules
           (id, profile_id, medicine_id, dosage, frequency_config, start_date, end_date, is_active, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -154,7 +150,7 @@ export async function pullFromCloud(): Promise<void> {
 
   if (doses) {
     for (const d of doses) {
-      await db.runAsync(
+      await runQuery(
         `INSERT INTO doses
           (id, profile_id, schedule_id, medicine_id, scheduled_time, taken_time, status, skip_reason, notification_id, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

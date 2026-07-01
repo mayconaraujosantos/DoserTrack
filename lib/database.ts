@@ -99,6 +99,12 @@ export async function initDatabase() {
       FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE,
       FOREIGN KEY (medicine_id) REFERENCES medicines(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS prescription_cache (
+      hash TEXT PRIMARY KEY,
+      result_json TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
   `);
 
   await ensureColumn('medicines', 'profile_id', 'INTEGER');
@@ -131,8 +137,56 @@ export async function initDatabase() {
   `);
 }
 
-export function getDatabase() {
-  return db;
+export async function getAllRows<T = Record<string, unknown>>(
+  sql: string,
+  params?: SQLite.SQLiteBindParams
+): Promise<T[]> {
+  if (params === undefined) {
+    return db.getAllAsync<T>(sql);
+  }
+  return db.getAllAsync<T>(sql, params);
+}
+
+export async function getFirstRow<T = Record<string, unknown>>(
+  sql: string,
+  params?: SQLite.SQLiteBindParams
+): Promise<T | null> {
+  if (params === undefined) {
+    return db.getFirstAsync<T>(sql);
+  }
+  const row = await db.getFirstAsync<T>(sql, params);
+  return row ?? null;
+}
+
+export async function runQuery(
+  sql: string,
+  params?: SQLite.SQLiteBindParams
+): Promise<SQLite.SQLiteRunResult> {
+  if (params === undefined) {
+    return db.runAsync(sql);
+  }
+  return db.runAsync(sql, params);
+}
+
+export async function getCachedPrescriptionByHash(hash: string): Promise<{
+  result_json: string;
+  created_at: number;
+} | null> {
+  return getFirstRow<{ result_json: string; created_at: number }>(
+    'SELECT result_json, created_at FROM prescription_cache WHERE hash = ?',
+    [hash]
+  );
+}
+
+export async function setPrescriptionCache(hash: string, resultJson: string): Promise<void> {
+  await runQuery(
+    'INSERT OR REPLACE INTO prescription_cache (hash, result_json, created_at) VALUES (?, ?, ?)',
+    [hash, resultJson, Date.now()]
+  );
+}
+
+export async function clearPrescriptionCache(): Promise<void> {
+  await runQuery('DELETE FROM prescription_cache');
 }
 
 export function setActiveProfileId(profileId: number) {
