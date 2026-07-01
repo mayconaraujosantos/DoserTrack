@@ -1,7 +1,12 @@
 import { Text } from '@/components/ui/Text';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
-import { getDosesForDate, getDosesForDateRange, updateDoseStatus } from '@/lib/database';
+import {
+  getDosesForDate,
+  getDosesForDateRange,
+  getMedicines,
+  updateDoseStatus,
+} from '@/lib/database';
 import { haptic } from '@/lib/haptics';
 import { useAppStore } from '@/lib/store';
 import { syncToCloud } from '@/lib/sync';
@@ -174,8 +179,7 @@ function DoseCard({
   const displayStatus = getDisplayStatus(dose);
   const color = STATUS_COLOR[displayStatus];
   const isTaken = displayStatus === 'taken';
-  const canToggle =
-    displayStatus === 'taken' || displayStatus === 'pending' || displayStatus === 'late';
+  const canToggle = displayStatus === 'pending' || displayStatus === 'late';
 
   return (
     <TouchableOpacity
@@ -470,6 +474,12 @@ export default function DashboardScreen() {
     enabled: dbReady,
   });
 
+  const { data: medicines = [] } = useQuery({
+    queryKey: ['medicines'],
+    queryFn: getMedicines,
+    enabled: dbReady,
+  });
+
   const { data: weekDoses = [] } = useQuery({
     queryKey: ['week-doses', weekAnchor],
     queryFn: () => getDosesForDateRange(weekAnchor, weekEnd),
@@ -584,6 +594,42 @@ export default function DashboardScreen() {
     }),
     [doses]
   );
+
+  const emptyFilterInfo = useMemo(() => {
+    if (search.trim() !== '' || filteredDoses.length > 0 || medicines.length === 0) {
+      return null;
+    }
+
+    if (activeFilter === 'taken') {
+      return {
+        icon: 'checkmark-done-circle-outline' as const,
+        title: 'Nenhuma dose tomada hoje',
+        description: 'Você ainda não marcou nenhuma dose como tomada para este filtro.',
+      };
+    }
+
+    if (activeFilter === 'late') {
+      return {
+        icon: 'time-outline' as const,
+        title: 'Nenhuma dose atrasada hoje',
+        description: 'Todas as doses agendadas estão em dia ou ainda não venceram.',
+      };
+    }
+
+    if (activeFilter === 'pending') {
+      return {
+        icon: 'alarm-outline' as const,
+        title: 'Nenhuma dose pendente hoje',
+        description: 'Todas as doses para hoje já foram tomadas ou não foram agendadas.',
+      };
+    }
+
+    return {
+      icon: 'medical' as const,
+      title: 'Nenhuma dose encontrada',
+      description: 'Adicione um medicamento ou crie um agendamento para ver suas doses aqui.',
+    };
+  }, [activeFilter, filteredDoses.length, medicines.length, search]);
 
   const monthLabel = `${MONTHS_PT[selectedDateObj.getMonth()]} ${selectedDateObj.getFullYear()}`;
   const dateLabel = selectedDateObj.toLocaleDateString('pt-BR', {
@@ -802,15 +848,34 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {!isLoading && filteredDoses.length === 0 && search.trim() === '' && (
-          <EmptyDoses
-            C={C}
-            theme={theme}
-            onScanRx={() => router.push('/scan-prescription')}
-            onAddMed={() => router.push('/add-medicine')}
-            onAddSched={() => router.push('/add-schedule')}
-          />
-        )}
+        {!isLoading &&
+          filteredDoses.length === 0 &&
+          search.trim() === '' &&
+          medicines.length > 0 &&
+          emptyFilterInfo && (
+            <View style={styles.emptyFilter}>
+              <Ionicons name={emptyFilterInfo.icon} size={36} color={C.primary} />
+              <Text style={[styles.emptyFilterTitle, { color: C.primary }]}>
+                {emptyFilterInfo.title}
+              </Text>
+              <Text style={[styles.emptyFilterDesc, { color: C.sub }]}>
+                {emptyFilterInfo.description}
+              </Text>
+            </View>
+          )}
+
+        {!isLoading &&
+          filteredDoses.length === 0 &&
+          search.trim() === '' &&
+          medicines.length === 0 && (
+            <EmptyDoses
+              C={C}
+              theme={theme}
+              onScanRx={() => router.push('/scan-prescription')}
+              onAddMed={() => router.push('/add-medicine')}
+              onAddSched={() => router.push('/add-schedule')}
+            />
+          )}
 
         {filteredDoses.map((dose, index) => {
           const isLast = index === filteredDoses.length - 1;
@@ -1068,6 +1133,9 @@ const styles = StyleSheet.create({
   // Empty search
   emptySearch: { alignItems: 'center', paddingVertical: 44, gap: 10 },
   emptySearchText: { fontSize: 14, fontWeight: '500', textAlign: 'center' },
+  emptyFilter: { alignItems: 'center', paddingVertical: 44, gap: 10, paddingHorizontal: 24 },
+  emptyFilterTitle: { fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  emptyFilterDesc: { fontSize: 14, textAlign: 'center', lineHeight: 21, maxWidth: 320 },
 });
 
 // ─── EmptyDoses styles ────────────────────────────────────────────────────────
