@@ -1,33 +1,37 @@
+import { Colors } from '@/constants/theme';
+import { onAuthStateChange } from '@/lib/auth';
+import { authenticate, isBiometricsEnabled } from '@/lib/biometrics';
+import { initDatabase, resolveProfile, setActiveProfileId } from '@/lib/database';
+import { logger } from '@/lib/logger';
+import {
+    addNotificationResponseListener,
+    checkOverdueDoses,
+    requestNotificationPermissions,
+    rescheduleAllPendingDoses,
+    schedulePeriodicOverdueNotification,
+    setupNotificationHandler,
+} from '@/lib/notifications';
+import { getStoredActiveProfileId, setStoredActiveProfileId } from '@/lib/storage';
+import { useAppStore } from '@/lib/store';
+import { pullFromCloud, syncToCloud } from '@/lib/sync';
+import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
-  AppState,
-  View,
-  ActivityIndicator,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
+    ActivityIndicator,
+    AppState,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
-import { Colors } from '@/constants/theme';
-import { initDatabase, resolveProfile, setActiveProfileId } from '@/lib/database';
-import {
-  setupNotificationHandler,
-  requestNotificationPermissions,
-  addNotificationResponseListener,
-  rescheduleAllPendingDoses,
-} from '@/lib/notifications';
-import { useAppStore } from '@/lib/store';
-import { getStoredActiveProfileId, setStoredActiveProfileId } from '@/lib/storage';
-import { onAuthStateChange } from '@/lib/auth';
-import { pullFromCloud, syncToCloud } from '@/lib/sync';
-import { isBiometricsEnabled, authenticate } from '@/lib/biometrics';
-import { logger } from '@/lib/logger';
 
 const log = logger.make('AppLayout');
 
 // System UI (image picker, camera, permission dialogs) causes brief
 // inactive/background transitions — only lock if absent longer than this.
 const LOCK_THRESHOLD_MS = 5_000;
+// Throttle overdue check to once per 10 minutes
+const OVERDUE_CHECK_THROTTLE_MS = 10 * 60 * 1000;
 
 export default function AppLayout() {
   const setDbReady = useAppStore(s => s.setDbReady);
@@ -38,6 +42,7 @@ export default function AppLayout() {
   const [dbError, setDbError] = useState(false);
   const appState = useRef(AppState.currentState);
   const backgroundEnteredAt = useRef<number>(0);
+  const lastOverdueCheckAt = useRef<number>(0);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', async next => {
@@ -51,6 +56,21 @@ export default function AppLayout() {
       if (next === 'active' && prev.match(/inactive|background/)) {
         log.info('app voltou ao foreground — iniciando syncToCloud');
         syncToCloud().catch(e => log.error('syncToCloud falhou:', e));
+
+        // Check for overdue doses with throttle
+        const now = Date.now();
+        if (now - lastOverdueCheckAt.current >= OVERDUE_CHECK_THROTTLE_MS) {
+          lastOverdueCheckAt.current = now;
+          const { count } = await checkOverdueDoses();
+          if (count > 0) {
+            log.info(`Verificado ${count} dose(s) atrasada(s) — mostrando modal`);
+            router.push('/overdue-doses');
+            schedulePeriodicOverdueNotification(60).catch(e =>
+              log.error('Erro ao agendar notif periódica:', e)
+            );
+          }
+        }
+
         const enabled = await isBiometricsEnabled();
         if (!enabled) return;
         if (Date.now() - backgroundEnteredAt.current < LOCK_THRESHOLD_MS) return;
@@ -60,7 +80,7 @@ export default function AppLayout() {
       }
     });
     return () => sub.remove();
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     log.info('montando — iniciando DB e listeners');
@@ -183,6 +203,10 @@ export default function AppLayout() {
       <Stack.Screen name="profiles" options={{ presentation: 'modal', title: 'Perfis' }} />
       <Stack.Screen
         name="reminder-alert"
+        options={{ presentation: 'fullScreenModal', headerShown: false }}
+      />
+      <Stack.Screen
+        name="overdue-doses"
         options={{ presentation: 'fullScreenModal', headerShown: false }}
       />
       <Stack.Screen
