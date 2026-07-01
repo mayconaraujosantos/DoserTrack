@@ -8,6 +8,7 @@ import {
   getDosesForDate,
   realignIntervalSchedule,
   updateDoseNotificationId,
+  updateDoseScheduleTime,
   updateDoseStatus,
 } from '@/lib/database';
 import { scheduleDoseNotification } from '@/lib/notifications';
@@ -75,14 +76,18 @@ export default function EditDoseScreen() {
 
   const [status, setStatus] = useState<DoseStatus>('pending');
   const [takenDate, setTakenDate] = useState<Date>(new Date());
+  const [scheduledDate, setScheduledDate] = useState<Date>(new Date());
   const [skipReason, setSkipReason] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showScheduleDatePicker, setShowScheduleDatePicker] = useState(false);
+  const [showScheduleTimePicker, setShowScheduleTimePicker] = useState(false);
 
   useEffect(() => {
     if (!dose) return;
     setStatus(dose.status);
     setTakenDate(isoToDate(dose.takenTime));
+    setScheduledDate(isoToDate(dose.scheduledTime));
     setSkipReason(dose.skipReason ?? '');
   }, [dose]);
 
@@ -131,7 +136,8 @@ export default function EditDoseScreen() {
       } else if (status === 'skipped') {
         await updateDoseStatus(doseId, 'skipped', undefined, skipReason || undefined);
       } else {
-        await updateDoseStatus(doseId, 'pending');
+        const scheduledIso = scheduledDate.toISOString();
+        await updateDoseScheduleTime(doseId, scheduledIso, status);
       }
       return { realigned: false };
     },
@@ -252,6 +258,39 @@ export default function EditDoseScreen() {
         </View>
       )}
 
+      {(status === 'pending' || status === 'snoozed') && (
+        <View style={styles.dateTimeRow}>
+          <View style={{ flex: 1 }}>
+            <Text variant="label" color={C.sub} style={styles.sectionLabel}>
+              Data agendada
+            </Text>
+            <TouchableOpacity
+              style={[styles.pickerBtn, { backgroundColor: C.card, borderColor: C.border }]}
+              onPress={() => setShowScheduleDatePicker(true)}
+            >
+              <Ionicons name="calendar-outline" size={16} color={C.sub} />
+              <Text variant="body" color={C.text}>
+                {scheduledDate.toLocaleDateString('pt-BR')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text variant="label" color={C.sub} style={styles.sectionLabel}>
+              Hora agendada
+            </Text>
+            <TouchableOpacity
+              style={[styles.pickerBtn, { backgroundColor: C.card, borderColor: C.border }]}
+              onPress={() => setShowScheduleTimePicker(true)}
+            >
+              <Ionicons name="time-outline" size={16} color={C.sub} />
+              <Text variant="body" color={C.text}>
+                {scheduledDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {showDatePicker && (
         <DateTimePicker
           value={takenDate}
@@ -279,6 +318,37 @@ export default function EditDoseScreen() {
             const updated = new Date(takenDate);
             updated.setHours(date.getHours(), date.getMinutes());
             setTakenDate(updated);
+          }}
+        />
+      )}
+
+      {showScheduleDatePicker && (
+        <DateTimePicker
+          value={scheduledDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={(_: DateTimePickerEvent, date?: Date) => {
+            setShowScheduleDatePicker(false);
+            if (!date) return;
+            const updated = new Date(scheduledDate);
+            updated.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
+            setScheduledDate(updated);
+          }}
+        />
+      )}
+
+      {showScheduleTimePicker && (
+        <DateTimePicker
+          value={scheduledDate}
+          mode="time"
+          is24Hour
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={(_: DateTimePickerEvent, date?: Date) => {
+            setShowScheduleTimePicker(false);
+            if (!date) return;
+            const updated = new Date(scheduledDate);
+            updated.setHours(date.getHours(), date.getMinutes());
+            setScheduledDate(updated);
           }}
         />
       )}
