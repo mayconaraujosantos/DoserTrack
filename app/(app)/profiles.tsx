@@ -1,34 +1,34 @@
-import { useState, useEffect } from 'react';
-import {
-  View,
-  TouchableOpacity,
-  StyleSheet,
-  Switch,
-  FlatList,
-  Alert,
-  ActivityIndicator,
-  type ListRenderItemInfo,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ionicons } from '@expo/vector-icons';
-import { createProfile, getProfiles, setActiveProfileId } from '@/lib/database';
-import { setStoredActiveProfileId } from '@/lib/storage';
-import { useAppStore } from '@/lib/store';
-import { signOut } from '@/lib/auth';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/form/Input';
+import { IconButton } from '@/components/ui/IconButton';
+import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/hooks/use-theme';
+import { signOut } from '@/lib/auth';
 import {
+  authenticate,
   isBiometricsAvailable,
   isBiometricsEnabled,
   setBiometricsEnabled,
-  authenticate,
 } from '@/lib/biometrics';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { IconButton } from '@/components/ui/IconButton';
-import { Text } from '@/components/ui/Text';
+import { createProfile, getProfiles, setActiveProfileId } from '@/lib/database';
+import { setStoredActiveProfileId } from '@/lib/storage';
+import { useAppStore } from '@/lib/store';
 import type { Profile } from '@/types';
+import { Ionicons } from '@expo/vector-icons';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Switch,
+  TouchableOpacity,
+  View,
+  type ListRenderItemInfo,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const PROFILE_COLORS = ['#4A90D9', '#27AE60', '#F39C12', '#E74C3C', '#16A085', '#8E44AD'];
 

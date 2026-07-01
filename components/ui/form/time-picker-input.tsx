@@ -6,22 +6,23 @@ import { useTheme } from '@/hooks/use-theme';
 
 interface Props {
   label: string;
-  value: string; // YYYY-MM-DD
+  value: string; // HH:MM
   onChange: (val: string) => void;
-  placeholder?: string;
 }
 
 function toDate(val: string): Date {
-  const d = new Date(val + 'T12:00:00');
-  return Number.isNaN(d.getTime()) ? new Date() : d;
+  const [h, m] = val.split(':').map(Number);
+  const d = new Date();
+  d.setHours(Number.isNaN(h) ? 8 : h, Number.isNaN(m) ? 0 : m, 0, 0);
+  return d;
 }
 
 function toStr(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function DatePickerInput({ label, value, onChange, placeholder }: Props) {
+export function TimePickerInput({ label, value, onChange }: Props) {
   const C = useTheme();
   const [show, setShow] = useState(false);
 
@@ -30,10 +31,6 @@ export function DatePickerInput({ label, value, onChange, placeholder }: Props) 
     if (selected) onChange(toStr(selected));
   }
 
-  const display = value
-    ? new Date(value + 'T12:00:00').toLocaleDateString('pt-BR')
-    : placeholder ?? 'Selecionar data';
-
   return (
     <View>
       <Text style={[styles.label, { color: C.sub }]}>{label}</Text>
@@ -41,16 +38,16 @@ export function DatePickerInput({ label, value, onChange, placeholder }: Props) 
         style={[styles.btn, { backgroundColor: C.card, borderColor: C.border }]}
         onPress={() => setShow(true)}
       >
-        <Ionicons name="calendar-outline" size={18} color={C.sub} />
-        <Text style={[styles.btnText, { color: value ? C.text : C.sub }]}>{display}</Text>
+        <Ionicons name="time-outline" size={18} color={C.sub} />
+        <Text style={[styles.btnText, { color: C.text }]}>{value || '08:00'}</Text>
       </TouchableOpacity>
       {show && (
         <DateTimePicker
           value={toDate(value)}
-          mode="date"
+          mode="time"
+          is24Hour
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
           onChange={handleChange}
-          locale="pt-BR"
         />
       )}
     </View>
@@ -60,9 +57,13 @@ export function DatePickerInput({ label, value, onChange, placeholder }: Props) 
 const styles = StyleSheet.create({
   label: { fontSize: 13, fontWeight: '600', marginBottom: 4 },
   btn: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    borderRadius: 12, paddingHorizontal: 14, height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 48,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  btnText: { fontSize: 15 },
+  btnText: { fontSize: 15, fontWeight: '500' },
 });

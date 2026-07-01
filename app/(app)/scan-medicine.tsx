@@ -1,3 +1,7 @@
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/form/Input';
+import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/hooks/use-theme';
 import { createMedicine } from '@/lib/database';
 import { scanMedicine, type MedicinePackageData } from '@/lib/medicine-scanner';
@@ -18,10 +22,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { Text } from '@/components/ui/Text';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 

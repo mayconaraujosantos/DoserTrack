@@ -1,41 +1,41 @@
-import { useState, useRef } from 'react';
-import {
-  View,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  Image,
-  Dimensions,
-} from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
+import { Text } from '@/components/ui/Text';
+import { DatePickerInput } from '@/components/ui/form/date-picker-input';
+import { TimePickerInput } from '@/components/ui/form/time-picker-input';
+import type { ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import {
   createMedicine,
   createSchedule,
   generateDosesForSchedule,
-  updateDoseNotificationId,
   getDosesForDate,
+  updateDoseNotificationId,
 } from '@/lib/database';
-import { useTheme } from '@/hooks/use-theme';
 import { haptic } from '@/lib/haptics';
 import { notifyLowStock, scheduleDoseNotification } from '@/lib/notifications';
 import { syncToCloud } from '@/lib/sync';
-import { Text } from '@/components/ui/Text';
-import { TimePickerInput } from '@/components/ui/time-picker-input';
-import { DatePickerInput } from '@/components/ui/date-picker-input';
-import type { MedicineType, FrequencyType, FrequencyConfig } from '@/types';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { FrequencyConfig, FrequencyType, MedicineType } from '@/types';
+import { Ionicons } from '@expo/vector-icons';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRef, useState } from 'react';
+import {
+  Alert,
+  Dimensions,
+  Image,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
   Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
-import type { ThemeColors } from '@/constants/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const TOTAL_STEPS = 3;
@@ -68,22 +68,22 @@ function todayStr() {
 
 // ─── Step Dots ────────────────────────────────────────────────────────────────
 
-function StepDots({ step, C }: { step: number; C: ThemeColors }) {
+function StepDots({ step, C }: Readonly<{ step: number; C: ThemeColors }>) {
   return (
     <View style={dots.row}>
-      {Array.from({ length: TOTAL_STEPS }, (_, i) => (
-        <View
-          key={i}
-          style={[
-            dots.base,
-            i === step
-              ? [dots.active, { backgroundColor: C.primary }]
-              : i < step
-                ? [dots.done, { backgroundColor: C.primary + '66' }]
-                : [dots.pending, { backgroundColor: C.border }],
-          ]}
-        />
-      ))}
+      {Array.from({ length: TOTAL_STEPS }, (_, i) => {
+        let barStyle;
+
+        if (i === step) {
+          barStyle = [dots.active, { backgroundColor: C.primary }];
+        } else if (i < step) {
+          barStyle = [dots.done, { backgroundColor: C.primary + '66' }];
+        } else {
+          barStyle = [dots.pending, { backgroundColor: C.border }];
+        }
+
+        return <View key={i} style={[dots.base, barStyle]} />;
+      })}
     </View>
   );
 }
@@ -105,12 +105,12 @@ function WizardHeader({
   onBack,
   C,
   topInset,
-}: {
+}: Readonly<{
   step: number;
   onBack: () => void;
   C: ThemeColors;
   topInset: number;
-}) {
+}>) {
   return (
     <View style={[wh.container, { paddingTop: topInset + 8, backgroundColor: C.bg }]}>
       <View style={wh.row}>

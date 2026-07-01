@@ -1,5 +1,8 @@
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/form/Input';
+import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/hooks/use-theme';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   getDoseById,
   getDosesForDate,
@@ -24,10 +27,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { Text } from '@/components/ui/Text';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const STATUS_OPTIONS: { value: DoseStatus; label: string; icon: string; desc: string }[] = [
   { value: 'taken', label: 'Tomado', icon: 'checkmark-circle', desc: 'Dose foi tomada' },

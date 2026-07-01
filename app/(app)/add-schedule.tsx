@@ -1,25 +1,25 @@
-import { useState } from 'react';
-import { View, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ionicons } from '@expo/vector-icons';
+import { Button } from '@/components/ui/Button';
+import { DatePickerInput } from '@/components/ui/form/date-picker-input';
+import { Input } from '@/components/ui/form/Input';
+import { TimePickerInput } from '@/components/ui/form/time-picker-input';
+import { IconButton } from '@/components/ui/IconButton';
+import { Text } from '@/components/ui/Text';
+import { useTheme } from '@/hooks/use-theme';
 import {
   createSchedule,
-  getMedicines,
   generateDosesForSchedule,
-  updateDoseNotificationId,
   getDosesForDate,
+  getMedicines,
+  updateDoseNotificationId,
 } from '@/lib/database';
 import { scheduleDoseNotification } from '@/lib/notifications';
 import { useAppStore } from '@/lib/store';
-import { useTheme } from '@/hooks/use-theme';
-import { DatePickerInput } from '@/components/ui/date-picker-input';
-import { TimePickerInput } from '@/components/ui/time-picker-input';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { IconButton } from '@/components/ui/IconButton';
-import { Text } from '@/components/ui/Text';
 import type { FrequencyType } from '@/types';
+import { Ionicons } from '@expo/vector-icons';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];

@@ -1,25 +1,25 @@
-import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/form/Input';
+import { Text } from '@/components/ui/Text';
+import { useTheme } from '@/hooks/use-theme';
+import { getMedicineById, updateMedicine } from '@/lib/database';
+import { useAppStore } from '@/lib/store';
+import type { MedicineType } from '@/types';
+import { Ionicons } from '@expo/vector-icons';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
-  View,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
   ActivityIndicator,
   Alert,
   Image,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import { getMedicineById, updateMedicine } from '@/lib/database';
-import { useAppStore } from '@/lib/store';
-import { useTheme } from '@/hooks/use-theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Text } from '@/components/ui/Text';
-import type { MedicineType } from '@/types';
 
 const TYPES: { value: MedicineType; label: string; icon: string }[] = [
   { value: 'capsule', label: 'Cápsula', icon: 'ellipse' },

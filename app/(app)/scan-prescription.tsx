@@ -1,3 +1,7 @@
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/form/Input';
+import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/hooks/use-theme';
 import {
   createMedicine,
@@ -9,7 +13,7 @@ import {
 } from '@/lib/database';
 import { scheduleDoseNotification } from '@/lib/notifications';
 import { scanPrescription, type PrescriptionData } from '@/lib/prescription-scanner';
-import { getCachedPrescription, cachePrescription, clearPrescriptionCache } from '@/lib/scan-cache';
+import { cachePrescription, clearPrescriptionCache, getCachedPrescription } from '@/lib/scan-cache';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useQueryClient } from '@tanstack/react-query';
@@ -27,10 +31,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { Text } from '@/components/ui/Text';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
