@@ -157,3 +157,48 @@ export function addNotificationResponseListener(
   const N = getNotifications();
   return N.addNotificationResponseReceivedListener(callback);
 }
+
+export async function checkOverdueDoses(): Promise<{ count: number; doses: any[] }> {
+  try {
+    const { getDosesForDate } = await import('@/lib/database');
+
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const doses = await getDosesForDate(today);
+
+    const overdue = doses.filter(d => {
+      const scheduled = new Date(d.scheduledTime);
+      return scheduled < now && d.status !== 'taken' && d.status !== 'skipped';
+    });
+
+    return { count: overdue.length, doses: overdue };
+  } catch {
+    return { count: 0, doses: [] };
+  }
+}
+
+export async function schedulePeriodicOverdueNotification(intervalMinutes = 60): Promise<void> {
+  if (IS_EXPO_GO) return;
+  try {
+    const N = getNotifications();
+    const { count } = await checkOverdueDoses();
+
+    if (count === 0) return;
+
+    await N.scheduleNotificationAsync({
+      content: {
+        title: 'Doses pendentes',
+        body: `Você tem ${count} dose${count > 1 ? 's' : ''} que ainda não ${count > 1 ? 'foram' : 'foi'} registrada${count > 1 ? 's' : ''}.`,
+        data: { type: 'overdue' },
+        sound: true,
+      },
+      trigger: {
+        type: N.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: intervalMinutes * 60,
+        repeats: true,
+      },
+    });
+  } catch {
+    // silently fail
+  }
+}
