@@ -1,13 +1,11 @@
-import { useEffect } from 'react';
-import { useRouter } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { hasSeenOnboarding, clearOnboardingFlag } from '@/lib/storage';
 import { getSession } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import { hasSeenOnboarding } from '@/lib/storage';
+import { useRouter } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from 'react';
 
 const log = logger.make('RouteGuard');
-
-let _devResetDone = false;
 
 export default function Index() {
   const router = useRouter();
@@ -15,11 +13,6 @@ export default function Index() {
   useEffect(() => {
     (async () => {
       log.info('iniciando verificação de rota...');
-
-      if (__DEV__ && !_devResetDone) {
-        _devResetDone = true;
-        await clearOnboardingFlag();
-      }
 
       const seen = await hasSeenOnboarding();
       log.info('hasSeenOnboarding:', seen);
