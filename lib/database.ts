@@ -454,6 +454,40 @@ export async function updateDoseStatus(
   scheduleWidgetUpdate();
 }
 
+export async function updateDoseScheduleTime(
+  id: number,
+  scheduledTime: string,
+  status: DoseStatus
+) {
+  const profileId = requireActiveProfileId();
+  const current = await db.getFirstAsync<{ notification_id: string | null }>(
+    'SELECT notification_id FROM doses WHERE id = ? AND profile_id = ?',
+    [id, profileId]
+  );
+
+  await db.runAsync(
+    'UPDATE doses SET scheduled_time = ?, status = ? WHERE id = ? AND profile_id = ?',
+    [scheduledTime, status, id, profileId]
+  );
+
+  if (current?.notification_id) {
+    const { cancelNotification } = await import('@/lib/notifications');
+    await cancelNotification(current.notification_id).catch(() => {});
+  }
+
+  const { scheduleDoseNotification } = await import('@/lib/notifications');
+  const dose = await getDoseById(id);
+  if (dose?.status === 'pending') {
+    const notifId = await scheduleDoseNotification({
+      id: dose.id,
+      medicineName: dose.medicineName ?? '',
+      dosage: dose.dosage ?? '',
+      scheduledTime: dose.scheduledTime,
+    });
+    if (notifId) await updateDoseNotificationId(dose.id, notifId);
+  }
+}
+
 export async function updateDoseNotificationId(id: number, notificationId: string) {
   const profileId = requireActiveProfileId();
   await db.runAsync('UPDATE doses SET notification_id = ? WHERE id = ? AND profile_id = ?', [

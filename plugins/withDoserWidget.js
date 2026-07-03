@@ -3,8 +3,9 @@ const {
   withAndroidManifest,
   withDangerousMod,
   withAppBuildGradle,
-} = require('@expo/config-plugins');
-const { getMainApplication } = require('@expo/config-plugins/build/android/Manifest');
+  AndroidConfig,
+} = require('expo/config-plugins');
+const { getMainApplication } = AndroidConfig.Manifest;
 const fs = require('fs');
 const path = require('path');
 

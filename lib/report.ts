@@ -4,7 +4,7 @@ import type { Dose } from '@/types';
 interface ReportOptions {
   profileName: string;
   startDate: string; // YYYY-MM-DD
-  endDate: string;   // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
 }
 
 interface MedicineSummary {
@@ -66,13 +66,15 @@ function barHtml(pct: number): string {
 
 export async function generateAdherenceReport(opts: ReportOptions): Promise<string> {
   const doses = await getDosesForDateRange(opts.startDate, opts.endDate);
-  const nonPending = doses.filter((d) => d.status !== 'pending');
-  const taken = nonPending.filter((d) => d.status === 'taken').length;
+  const nonPending = doses.filter(d => d.status !== 'pending');
+  const taken = nonPending.filter(d => d.status === 'taken').length;
   const total = nonPending.length;
   const overallPct = total > 0 ? Math.round((taken / total) * 100) : 0;
   const summaries = buildMedicineSummaries(nonPending);
 
-  const summaryRows = summaries.map((s) => `
+  const summaryRows = summaries
+    .map(
+      s => `
     <tr>
       <td>${s.name}</td>
       <td style="text-align:center;color:#27AE60;">${s.taken}</td>
@@ -81,9 +83,14 @@ export async function generateAdherenceReport(opts: ReportOptions): Promise<stri
       <td style="text-align:center;">
         ${barHtml(s.pct)}
       </td>
-    </tr>`).join('');
+    </tr>`
+    )
+    .join('');
 
-  const recentRows = nonPending.slice(0, 60).map((d) => `
+  const recentRows = nonPending
+    .slice(0, 60)
+    .map(
+      d => `
     <tr>
       <td>${fmtDate(d.scheduledTime)}</td>
       <td>${fmtTime(d.scheduledTime)}</td>
@@ -91,7 +98,9 @@ export async function generateAdherenceReport(opts: ReportOptions): Promise<stri
       <td>${d.dosage ?? '-'}</td>
       <td style="color:${statusColor(d.status)};font-weight:600;">${statusLabel(d.status)}</td>
       <td>${d.takenTime ? fmtTime(d.takenTime) : '-'}</td>
-    </tr>`).join('');
+    </tr>`
+    )
+    .join('');
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">

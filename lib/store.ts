@@ -14,11 +14,11 @@ interface AppStore {
   setActiveProfile: (profile: Profile | null) => void;
 }
 
-export const useAppStore = create<AppStore>((set) => ({
+export const useAppStore = create<AppStore>(set => ({
   selectedDate: todayStr(),
-  setSelectedDate: (date) => set({ selectedDate: date }),
+  setSelectedDate: date => set({ selectedDate: date }),
   dbReady: false,
-  setDbReady: (ready) => set({ dbReady: ready }),
+  setDbReady: ready => set({ dbReady: ready }),
   activeProfile: null,
-  setActiveProfile: (profile) => set({ activeProfile: profile }),
+  setActiveProfile: profile => set({ activeProfile: profile }),
 }));

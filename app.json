@@ -47,7 +47,15 @@
       "expo-sqlite",
       "expo-notifications",
       "expo-image-picker",
-      "./plugins/withDoserWidget.js"
+      "./plugins/withDoserWidget.js",
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "SUA_ORG_SENTRY",
+          "project": "SEU_PROJETO_SENTRY"
+        }
+      ],
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true,

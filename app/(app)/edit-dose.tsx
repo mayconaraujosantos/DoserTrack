@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/form/Input';
 import { Text } from '@/components/ui/Text';
+import { useDoseForm } from '@/hooks/use-dose-form';
 import { useTheme } from '@/hooks/use-theme';
 import {
   getDoseById,
@@ -18,7 +19,6 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -52,10 +52,35 @@ function formatDateTime(iso: string) {
   });
 }
 
-function isoToDate(iso: string | undefined): Date {
-  if (!iso) return new Date();
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? new Date() : d;
+async function rescheduleAfterRealign(scheduleId: number): Promise<void> {
+  const now = new Date();
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + i);
+    const dateStr = d.toISOString().split('T')[0];
+    const dayDoses = await getDosesForDate(dateStr);
+
+    for (const futureDose of dayDoses) {
+      if (
+        futureDose.scheduleId === scheduleId &&
+        futureDose.status === 'pending' &&
+        new Date(futureDose.scheduledTime) > now &&
+        !futureDose.notificationId
+      ) {
+        const notifId = await scheduleDoseNotification({
+          id: futureDose.id,
+          medicineName: futureDose.medicineName ?? '',
+          dosage: futureDose.dosage ?? '',
+          scheduledTime: futureDose.scheduledTime,
+        });
+
+        if (notifId) {
+          await updateDoseNotificationId(futureDose.id, notifId);
+        }
+      }
+    }
+  }
 }
 
 export default function EditDoseScreen() {
@@ -74,53 +99,22 @@ export default function EditDoseScreen() {
     enabled: dbReady && doseId > 0,
   });
 
-  const [status, setStatus] = useState<DoseStatus>('pending');
-  const [takenDate, setTakenDate] = useState<Date>(new Date());
-  const [scheduledDate, setScheduledDate] = useState<Date>(new Date());
-  const [skipReason, setSkipReason] = useState('');
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
-  const [showScheduleDatePicker, setShowScheduleDatePicker] = useState(false);
-  const [showScheduleTimePicker, setShowScheduleTimePicker] = useState(false);
-
-  useEffect(() => {
-    if (!dose) return;
-    setStatus(dose.status);
-    setTakenDate(isoToDate(dose.takenTime));
-    setScheduledDate(isoToDate(dose.scheduledTime));
-    setSkipReason(dose.skipReason ?? '');
-  }, [dose]);
+  const {
+    status,
+    takenDate,
+    scheduledDate,
+    skipReason,
+    setStatus,
+    setTakenDate,
+    setScheduledDate,
+    setSkipReason,
+    picker,
+  } = useDoseForm(dose);
 
   function isTimeShifted(scheduledIso: string, taken: Date): boolean {
     const scheduled = new Date(scheduledIso);
     const diffMinutes = Math.abs(taken.getTime() - scheduled.getTime()) / 60_000;
     return diffMinutes >= 5;
-  }
-
-  async function rescheduleAfterRealign(scheduleId: number) {
-    const now = new Date();
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(now);
-      d.setDate(d.getDate() + i);
-      const dateStr = d.toISOString().split('T')[0];
-      const dayDoses = await getDosesForDate(dateStr);
-      for (const futureDose of dayDoses) {
-        if (
-          futureDose.scheduleId === scheduleId &&
-          futureDose.status === 'pending' &&
-          new Date(futureDose.scheduledTime) > now &&
-          !futureDose.notificationId
-        ) {
-          const notifId = await scheduleDoseNotification({
-            id: futureDose.id,
-            medicineName: futureDose.medicineName ?? '',
-            dosage: futureDose.dosage ?? '',
-            scheduledTime: futureDose.scheduledTime,
-          });
-          if (notifId) await updateDoseNotificationId(futureDose.id, notifId);
-        }
-      }
-    }
   }
 
   const mutation = useMutation({
@@ -233,7 +227,7 @@ export default function EditDoseScreen() {
             </Text>
             <TouchableOpacity
               style={[styles.pickerBtn, { backgroundColor: C.card, borderColor: C.border }]}
-              onPress={() => setShowDatePicker(true)}
+              onPress={() => picker.open('date')}
             >
               <Ionicons name="calendar-outline" size={16} color={C.sub} />
               <Text variant="body" color={C.text}>
@@ -247,7 +241,7 @@ export default function EditDoseScreen() {
             </Text>
             <TouchableOpacity
               style={[styles.pickerBtn, { backgroundColor: C.card, borderColor: C.border }]}
-              onPress={() => setShowTimePicker(true)}
+              onPress={() => picker.open('time')}
             >
               <Ionicons name="time-outline" size={16} color={C.sub} />
               <Text variant="body" color={C.text}>
@@ -266,7 +260,7 @@ export default function EditDoseScreen() {
             </Text>
             <TouchableOpacity
               style={[styles.pickerBtn, { backgroundColor: C.card, borderColor: C.border }]}
-              onPress={() => setShowScheduleDatePicker(true)}
+              onPress={() => picker.open('scheduleDate')}
             >
               <Ionicons name="calendar-outline" size={16} color={C.sub} />
               <Text variant="body" color={C.text}>
@@ -280,7 +274,7 @@ export default function EditDoseScreen() {
             </Text>
             <TouchableOpacity
               style={[styles.pickerBtn, { backgroundColor: C.card, borderColor: C.border }]}
-              onPress={() => setShowScheduleTimePicker(true)}
+              onPress={() => picker.open('scheduleTime')}
             >
               <Ionicons name="time-outline" size={16} color={C.sub} />
               <Text variant="body" color={C.text}>
@@ -291,13 +285,13 @@ export default function EditDoseScreen() {
         </View>
       )}
 
-      {showDatePicker && (
+      {picker.isOpen('date') && (
         <DateTimePicker
           value={takenDate}
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
           onChange={(_: DateTimePickerEvent, date?: Date) => {
-            setShowDatePicker(false);
+            picker.close();
             if (!date) return;
             const updated = new Date(takenDate);
             updated.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
@@ -306,14 +300,14 @@ export default function EditDoseScreen() {
         />
       )}
 
-      {showTimePicker && (
+      {picker.isOpen('time') && (
         <DateTimePicker
           value={takenDate}
           mode="time"
           is24Hour
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
           onChange={(_: DateTimePickerEvent, date?: Date) => {
-            setShowTimePicker(false);
+            picker.close();
             if (!date) return;
             const updated = new Date(takenDate);
             updated.setHours(date.getHours(), date.getMinutes());
@@ -322,13 +316,13 @@ export default function EditDoseScreen() {
         />
       )}
 
-      {showScheduleDatePicker && (
+      {picker.isOpen('scheduleDate') && (
         <DateTimePicker
           value={scheduledDate}
           mode="date"
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
           onChange={(_: DateTimePickerEvent, date?: Date) => {
-            setShowScheduleDatePicker(false);
+            picker.close();
             if (!date) return;
             const updated = new Date(scheduledDate);
             updated.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
@@ -337,14 +331,14 @@ export default function EditDoseScreen() {
         />
       )}
 
-      {showScheduleTimePicker && (
+      {picker.isOpen('scheduleTime') && (
         <DateTimePicker
           value={scheduledDate}
           mode="time"
           is24Hour
           display={Platform.OS === 'ios' ? 'spinner' : 'default'}
           onChange={(_: DateTimePickerEvent, date?: Date) => {
-            setShowScheduleTimePicker(false);
+            picker.close();
             if (!date) return;
             const updated = new Date(scheduledDate);
             updated.setHours(date.getHours(), date.getMinutes());

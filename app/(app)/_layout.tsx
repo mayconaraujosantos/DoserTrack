@@ -4,12 +4,12 @@ import { authenticate, isBiometricsEnabled } from '@/lib/biometrics';
 import { initDatabase, resolveProfile, setActiveProfileId } from '@/lib/database';
 import { logger } from '@/lib/logger';
 import {
-    addNotificationResponseListener,
-    checkOverdueDoses,
-    requestNotificationPermissions,
-    rescheduleAllPendingDoses,
-    schedulePeriodicOverdueNotification,
-    setupNotificationHandler,
+  addNotificationResponseListener,
+  checkOverdueDoses,
+  requestNotificationPermissions,
+  rescheduleAllPendingDoses,
+  schedulePeriodicOverdueNotification,
+  setupNotificationHandler,
 } from '@/lib/notifications';
 import { getStoredActiveProfileId, setStoredActiveProfileId } from '@/lib/storage';
 import { useAppStore } from '@/lib/store';
@@ -17,12 +17,12 @@ import { pullFromCloud, syncToCloud } from '@/lib/sync';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    AppState,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  AppState,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 const log = logger.make('AppLayout');

@@ -7,9 +7,11 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { queryClient } from '@/lib/query-client';
+import { initSentry, Sentry } from '@/lib/sentry';
 
 // Impede o splash de esconder automaticamente enquanto o app inicializa
 SplashScreen.preventAutoHideAsync();
+initSentry();
 
 const LightTheme = {
   ...DefaultTheme,
@@ -37,7 +39,7 @@ const DarkAppTheme = {
   },
 };
 
-export default function RootLayout() {
+function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
@@ -55,3 +57,5 @@ export default function RootLayout() {
     </ErrorBoundary>
   );
 }
+
+export default Sentry.wrap(RootLayout);
