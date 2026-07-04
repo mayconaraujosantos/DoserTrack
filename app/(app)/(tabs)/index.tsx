@@ -308,12 +308,20 @@ function DayCell({
 type EmptyDosesProps = {
   C: HomeColors;
   theme: ReturnType<typeof useTheme>;
+  hasMedicines: boolean;
   onScanRx: () => void;
   onAddMed: () => void;
   onAddSched: () => void;
 };
 
-function EmptyDoses({ C, theme, onScanRx, onAddMed, onAddSched }: EmptyDosesProps) {
+function EmptyDoses({
+  C,
+  theme,
+  hasMedicines,
+  onScanRx,
+  onAddMed,
+  onAddSched,
+}: Readonly<EmptyDosesProps>) {
   const opacity = useSharedValue(0);
   const slideY = useSharedValue(28);
 
@@ -377,9 +385,13 @@ function EmptyDoses({ C, theme, onScanRx, onAddMed, onAddSched }: EmptyDosesProp
         </View>
       </View>
 
-      <Text style={[es.heading, { color: C.primary }]}>Sem doses para hoje</Text>
+      <Text style={[es.heading, { color: C.primary }]}>
+        {hasMedicines ? 'Sem doses para esta data' : 'Nenhum dado registrado ainda'}
+      </Text>
       <Text style={[es.sub, { color: C.sub }]}>
-        Adicione seus medicamentos e configure{'\n'}os horários de dose
+        {hasMedicines
+          ? 'Você já tem medicamentos cadastrados, mas ainda não há doses para este dia. Crie um agendamento para começar.'
+          : 'Você ainda não tem medicamentos ou doses cadastrados.\nComece adicionando seu primeiro remédio.'}
       </Text>
 
       {/* Lista de ações */}
@@ -594,6 +606,9 @@ export default function DashboardScreen() {
     }),
     [doses]
   );
+
+  const showEmptyVisual = !isLoading && filteredDoses.length === 0 && search.trim() === '';
+  const showMainEmptyVisual = showEmptyVisual && activeFilter === 'all';
 
   const emptyFilterInfo = useMemo(() => {
     if (search.trim() !== '' || filteredDoses.length > 0 || medicines.length === 0) {
@@ -848,7 +863,8 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {!isLoading &&
+        {!showMainEmptyVisual &&
+          !isLoading &&
           filteredDoses.length === 0 &&
           search.trim() === '' &&
           medicines.length > 0 &&
@@ -864,18 +880,16 @@ export default function DashboardScreen() {
             </View>
           )}
 
-        {!isLoading &&
-          filteredDoses.length === 0 &&
-          search.trim() === '' &&
-          medicines.length === 0 && (
-            <EmptyDoses
-              C={C}
-              theme={theme}
-              onScanRx={() => router.push('/scan-prescription')}
-              onAddMed={() => router.push('/add-medicine')}
-              onAddSched={() => router.push('/add-schedule')}
-            />
-          )}
+        {showMainEmptyVisual && (
+          <EmptyDoses
+            C={C}
+            theme={theme}
+            hasMedicines={medicines.length > 0}
+            onScanRx={() => router.push('/scan-prescription')}
+            onAddMed={() => router.push('/add-medicine')}
+            onAddSched={() => router.push('/add-schedule')}
+          />
+        )}
 
         {filteredDoses.map((dose, index) => {
           const isLast = index === filteredDoses.length - 1;
