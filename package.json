@@ -16,7 +16,7 @@
     "format:check": "prettier --check .",
     "test": "jest --watchAll=false",
     "test:coverage": "jest --coverage --watchAll=false",
-    "prepare": "node -e \"const fs=require('fs');const path='node_modules/.bin/husky';if(fs.existsSync(path))require('child_process').execSync(path,{stdio:'inherit'});\""
+    "prepare": "husky"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
