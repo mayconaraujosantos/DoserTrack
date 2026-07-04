@@ -1,17 +1,17 @@
-import type { ThemeColors } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import React, { useCallback, useEffect } from 'react';
+import { View, Pressable, StyleSheet } from 'react-native';
+import Animated, {
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, {
-    interpolateColor,
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring,
-    withTiming,
-} from 'react-native-reanimated';
+import { useTheme } from '@/hooks/use-theme';
+import type { ThemeColors } from '@/constants/theme';
 
 const SPRING = { damping: 20, stiffness: 260, mass: 0.9 };
 
@@ -34,7 +34,7 @@ type PillItemProps = {
   C: ThemeColors;
 };
 
-function PillItem({ label, icon, isFocused, onPress, onLongPress, C }: Readonly<PillItemProps>) {
+function PillItem({ label, icon, isFocused, onPress, onLongPress, C }: PillItemProps) {
   const progress = useSharedValue(isFocused ? 1 : 0);
   const pressScale = useSharedValue(1);
 
@@ -91,64 +91,12 @@ function PillItem({ label, icon, isFocused, onPress, onLongPress, C }: Readonly<
 // ── Botão de ação fixo (abre Quick Actions Sheet) ────────────────────────────
 
 type ActionButtonProps = {
-  onScanMedicine: () => void;
-  onScanPrescription: () => void;
-  onAddMedicine: () => void;
-  onAddSchedule: () => void;
+  onPress: () => void;
   C: ThemeColors;
 };
 
-type ActionMenuItem = {
-  key: string;
-  icon: React.ComponentProps<typeof Ionicons>['name'];
-  label: string;
-  onPress: () => void;
-};
-
-function ActionButton({
-  onScanMedicine,
-  onScanPrescription,
-  onAddMedicine,
-  onAddSchedule,
-  C,
-}: Readonly<ActionButtonProps>) {
-  const [isOpen, setIsOpen] = useState(false);
+function ActionButton({ onPress, C }: ActionButtonProps) {
   const pressScale = useSharedValue(1);
-  const menuProgress = useSharedValue(0);
-
-  const actions = useMemo<ActionMenuItem[]>(
-    () => [
-      {
-        key: 'scan-med',
-        icon: 'scan-outline',
-        label: 'Escanear embalagem',
-        onPress: onScanMedicine,
-      },
-      {
-        key: 'scan-rx',
-        icon: 'document-text-outline',
-        label: 'Escanear receita',
-        onPress: onScanPrescription,
-      },
-      {
-        key: 'add-med',
-        icon: 'add-circle-outline',
-        label: 'Novo remédio',
-        onPress: onAddMedicine,
-      },
-      {
-        key: 'add-sched',
-        icon: 'alarm-outline',
-        label: 'Novo agendamento',
-        onPress: onAddSchedule,
-      },
-    ],
-    [onAddMedicine, onAddSchedule, onScanMedicine, onScanPrescription]
-  );
-
-  useEffect(() => {
-    menuProgress.value = withTiming(isOpen ? 1 : 0, { duration: 220 });
-  }, [isOpen, menuProgress]);
 
   const handlePressIn = useCallback(() => {
     pressScale.value = withSpring(0.88, SPRING);
@@ -165,55 +113,17 @@ function ActionButton({
     transform: [{ scale: pressScale.value }],
   }));
 
-  const menuStyle = useAnimatedStyle(() => ({
-    opacity: menuProgress.value,
-    transform: [{ translateY: (1 - menuProgress.value) * 10 }],
-  }));
-
-  const onMainPress = useCallback(() => {
-    setIsOpen(prev => !prev);
-  }, []);
-
-  const onActionPress = useCallback((handler: () => void) => {
-    setIsOpen(false);
-    handler();
-  }, []);
-
   return (
     <Animated.View style={[s.actionWrapper, itemStyle]}>
-      {isOpen && (
-        <Animated.View
-          style={[s.actionMenu, { backgroundColor: C.card, borderColor: C.border }, menuStyle]}
-        >
-          {actions.map(action => (
-            <Pressable
-              key={action.key}
-              onPress={() => onActionPress(action.onPress)}
-              style={({ pressed }) => [s.actionMenuItem, { opacity: pressed ? 0.7 : 1 }]}
-              accessibilityRole="button"
-              accessibilityLabel={action.label}
-            >
-              <Ionicons name={action.icon} size={18} color={C.primary} />
-              <View style={s.actionMenuLabelWrap}>
-                <Animated.Text style={[s.actionMenuLabel, { color: C.text }]}>
-                  {action.label}
-                </Animated.Text>
-              </View>
-            </Pressable>
-          ))}
-        </Animated.View>
-      )}
-
       <Pressable
-        onPress={onMainPress}
+        onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         style={[s.actionButton, { backgroundColor: C.navAction, borderColor: C.bg }]}
         accessibilityRole="button"
-        accessibilityLabel="Adicionar ou escanear"
-        accessibilityHint="Toque para abrir ações rápidas"
+        accessibilityLabel="Ações rápidas"
       >
-        <Ionicons name={isOpen ? 'close' : 'add'} size={26} color="#FFFFFF" />
+        <Ionicons name="scan-outline" size={26} color="#FFFFFF" />
       </Pressable>
     </Animated.View>
   );
@@ -222,10 +132,7 @@ function ActionButton({
 // ── Tab bar principal ────────────────────────────────────────────────────────
 
 export type AnimatedTabBarProps = BottomTabBarProps & {
-  onScanMedicine: () => void;
-  onScanPrescription: () => void;
-  onAddMedicine: () => void;
-  onAddSchedule: () => void;
+  onActionPress: () => void;
 };
 
 export function AnimatedTabBar({
@@ -233,10 +140,7 @@ export function AnimatedTabBar({
   descriptors,
   navigation,
   insets,
-  onScanMedicine,
-  onScanPrescription,
-  onAddMedicine,
-  onAddSchedule,
+  onActionPress,
 }: AnimatedTabBarProps) {
   const C = useTheme();
 
@@ -286,14 +190,8 @@ export function AnimatedTabBar({
           })}
         </View>
 
-        {/* Botão protruso — menu de ações sem modal */}
-        <ActionButton
-          onScanMedicine={onScanMedicine}
-          onScanPrescription={onScanPrescription}
-          onAddMedicine={onAddMedicine}
-          onAddSchedule={onAddSchedule}
-          C={C}
-        />
+        {/* Botão protruso — abre Quick Actions */}
+        <ActionButton onPress={onActionPress} C={C} />
       </View>
     </View>
   );
@@ -346,34 +244,6 @@ const s = StyleSheet.create({
   actionWrapper: {
     marginLeft: -OVERLAP,
     zIndex: 10,
-  },
-  actionMenu: {
-    position: 'absolute',
-    right: 4,
-    bottom: ACTION_D + 10,
-    minWidth: 210,
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.16,
-    shadowRadius: 10,
-    elevation: 12,
-  },
-  actionMenuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-  },
-  actionMenuLabelWrap: {
-    flex: 1,
-  },
-  actionMenuLabel: {
-    fontSize: 13,
-    fontWeight: '600',
   },
   actionButton: {
     width: ACTION_D,

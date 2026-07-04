@@ -1,7 +1,8 @@
-import { AnimatedTabBar } from '@/components/animated-tab-bar';
+import { useState } from 'react';
+import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { Tabs, useRouter } from 'expo-router';
+import { AnimatedTabBar } from '@/components/animated-tab-bar';
+import { QuickActionsSheet } from '@/components/quick-actions-sheet';
 
 type IconProps = Readonly<{ color: string; size: number }>;
 
@@ -19,30 +20,27 @@ function HistoryIcon({ color, size }: IconProps) {
 }
 
 export default function TabLayout() {
-  const router = useRouter();
-
-  const renderTabBar = (props: BottomTabBarProps) => (
-    <AnimatedTabBar
-      {...props}
-      onScanMedicine={() => router.push('/scan-medicine')}
-      onScanPrescription={() => router.push('/scan-prescription')}
-      onAddMedicine={() => router.push('/add-medicine')}
-      onAddSchedule={() => router.push('/add-schedule')}
-    />
-  );
+  const [showActions, setShowActions] = useState(false);
 
   return (
-    <Tabs tabBar={renderTabBar} screenOptions={{ headerShown: false }}>
-      {/* Abas visíveis na pill */}
-      <Tabs.Screen name="index" options={{ title: 'Hoje', tabBarIcon: TodayIcon }} />
-      <Tabs.Screen name="medicines" options={{ title: 'Remédios', tabBarIcon: MedsIcon }} />
-      <Tabs.Screen name="schedule" options={{ title: 'Agenda', tabBarIcon: ScheduleIcon }} />
+    <>
+      <Tabs
+        tabBar={props => <AnimatedTabBar {...props} onActionPress={() => setShowActions(true)} />}
+        screenOptions={{ headerShown: false }}
+      >
+        {/* Abas visíveis na pill */}
+        <Tabs.Screen name="index" options={{ title: 'Hoje', tabBarIcon: TodayIcon }} />
+        <Tabs.Screen name="medicines" options={{ title: 'Remédios', tabBarIcon: MedsIcon }} />
+        <Tabs.Screen name="schedule" options={{ title: 'Agenda', tabBarIcon: ScheduleIcon }} />
 
-      {/* Histórico: acessível via router.push */}
-      <Tabs.Screen
-        name="history"
-        options={{ title: 'Histórico', tabBarIcon: HistoryIcon, href: null }}
-      />
-    </Tabs>
+        {/* Histórico: acessível via Quick Actions Sheet ou router.push */}
+        <Tabs.Screen
+          name="history"
+          options={{ title: 'Histórico', tabBarIcon: HistoryIcon, href: null }}
+        />
+      </Tabs>
+
+      <QuickActionsSheet visible={showActions} onClose={() => setShowActions(false)} />
+    </>
   );
 }
