@@ -25,6 +25,8 @@ describe('LoginScreen', () => {
 
   it('pressionar o botão sem e-mail/senha não chama signIn', () => {
     render(<LoginScreen />);
+    fireEvent.changeText(screen.getByPlaceholderText('seu@email.com'), '');
+    fireEvent.changeText(screen.getByPlaceholderText('••••••••'), '');
     fireEvent.press(screen.getByTestId('btn-login'));
     expect(auth.signIn).not.toHaveBeenCalled();
   });

@@ -26,13 +26,13 @@ describe('OnboardingScreen', () => {
   it('renderiza o título do primeiro slide após a splash', async () => {
     render(<OnboardingScreen />);
     await skipSplash();
-    expect(screen.getByText('Bem-vindo ao Doser')).toBeTruthy();
+    expect(screen.getByText('Bem-vindo ao DoserTrack')).toBeTruthy();
   });
 
   it('botão Próximo avança para o slide seguinte', async () => {
     render(<OnboardingScreen />);
     await skipSplash();
-    fireEvent.press(screen.getByLabelText('Próximo'));
+    fireEvent.press(screen.getByLabelText('Próximo slide'));
     expect(screen.getByText('Escaneie sua receita')).toBeTruthy();
   });
 
@@ -40,14 +40,14 @@ describe('OnboardingScreen', () => {
     render(<OnboardingScreen />);
     await skipSplash();
     fireEvent.press(screen.getByText('Pular'));
-    expect(screen.getByText('Nunca esqueça uma dose')).toBeTruthy();
+    expect(screen.getByText('Nunca perca uma dose')).toBeTruthy();
   });
 
   it('último slide exibe botões "Criar conta" e "Já tenho conta"', async () => {
     render(<OnboardingScreen />);
     await skipSplash();
     fireEvent.press(screen.getByText('Pular'));
-    expect(screen.getByText('Criar conta')).toBeTruthy();
+    expect(screen.getByText('Criar conta grátis')).toBeTruthy();
     expect(screen.getByText('Já tenho conta')).toBeTruthy();
   });
 
@@ -55,7 +55,7 @@ describe('OnboardingScreen', () => {
     render(<OnboardingScreen />);
     await skipSplash();
     fireEvent.press(screen.getByText('Pular'));
-    fireEvent.press(screen.getByText('Criar conta'));
+    fireEvent.press(screen.getByText('Criar conta grátis'));
     await waitFor(() => {
       expect(storage.markOnboardingDone).toHaveBeenCalled();
       expect(mockRouter.replace).toHaveBeenCalledWith('/register');
