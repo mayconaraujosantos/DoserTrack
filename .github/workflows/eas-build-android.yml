@@ -1,0 +1,38 @@
+name: EAS Build (Android)
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Profile do eas.json'
+        required: true
+        default: preview
+        type: choice
+        options:
+          - development
+          - preview
+          - preview2
+          - preview3
+          - production
+          - apk
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build on EAS
+        run: eas build --platform android --profile ${{ inputs.profile }} --non-interactive
