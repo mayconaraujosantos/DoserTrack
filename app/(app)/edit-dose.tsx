@@ -1,7 +1,7 @@
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/form/Input';
-import { Text } from '@/components/ui/Text';
+import { Button } from '@/components/ui/button/Button';
+import { Card } from '@/components/ui/card/Card';
+import { Input } from '@/components/ui/input/Input';
+import { Text } from '@/components/ui/text/Text';
 import { useDoseForm } from '@/hooks/use-dose-form';
 import { useTheme } from '@/hooks/use-theme';
 import {

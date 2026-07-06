@@ -1,7 +1,7 @@
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/form/Input';
-import { IconButton } from '@/components/ui/IconButton';
-import { Text } from '@/components/ui/Text';
+import { Card } from '@/components/ui/card/Card';
+import { Input } from '@/components/ui/input/Input';
+import { IconButton } from '@/components/ui/button/IconButton';
+import { Text } from '@/components/ui/text/Text';
 import { useTheme } from '@/hooks/use-theme';
 import { signOut } from '@/lib/auth';
 import {

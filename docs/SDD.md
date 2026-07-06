@@ -467,7 +467,7 @@ Chamam Supabase Edge Functions que invocam Gemini Vision para extrair dados estr
 
 ### `components/ui/`
 
-Primitivos de UI reutilizáveis: `Button`, `Card`, `Input`, `Badge`, `Text`, `EmptyState`, `ScreenHeader`, `Skeleton`, etc. Todos theme-aware via `useTheme()`.
+Primitivos de UI reutilizáveis, organizados em subpastas por tipo de componente: `button/` (`Button`, `IconButton`), `card/`, `input/` (`Input`, `date-picker-input`, `time-picker-input`), `badge/`, `text/`, `toast/` (`SuccessToast`), `empty-state/`, `header/` (`ScreenHeader`), `skeleton/`, `icon/` (`icon-symbol`), `collapsible/`, `widget/` (`adherence-widget`). Todos theme-aware via `useTheme()`.
 
 ---
 

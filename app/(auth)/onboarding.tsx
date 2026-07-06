@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { markOnboardingDone } from '@/lib/storage';
 import { useTheme } from '@/hooks/use-theme';
-import { Text } from '@/components/ui/Text';
+import { Text } from '@/components/ui/text/Text';
 
 const { width: W } = Dimensions.get('window');
 

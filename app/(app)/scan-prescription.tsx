@@ -1,7 +1,8 @@
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/form/Input';
-import { Text } from '@/components/ui/Text';
+import { Button } from '@/components/ui/button/Button';
+import { Card } from '@/components/ui/card/Card';
+import { Input } from '@/components/ui/input/Input';
+import { SuccessToast } from '@/components/ui/toast/SuccessToast';
+import { Text } from '@/components/ui/text/Text';
 import { useTheme } from '@/hooks/use-theme';
 import {
   createMedicine,
@@ -23,7 +24,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -248,9 +248,9 @@ const chipStyles = StyleSheet.create({
   confirmBtn: { alignSelf: 'center', paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12 },
 });
 
-// ─── ConfirmModal ─────────────────────────────────────────────────────────────
+// ─── Inline Editor ────────────────────────────────────────────────────────────
 
-function ConfirmModal({
+function ConfirmInlineEditor({
   state,
   onConfirm,
   onCancel,
@@ -290,174 +290,177 @@ function ConfirmModal({
   }
 
   return (
-    <Modal visible animationType="slide" transparent onRequestClose={onCancel}>
-      <View style={[modalStyles.overlay]}>
-        <View style={[modalStyles.sheet, { backgroundColor: C.bg }]}>
-          <View style={[modalStyles.handle, { backgroundColor: C.border }]} />
+    <Card
+      variant="outlined"
+      style={[modalStyles.sheet, { backgroundColor: C.bg, borderColor: C.border }]}
+    >
+      <View style={modalStyles.header}>
+        <View style={{ flex: 1 }}>
+          <Text variant="title" numberOfLines={1}>
+            {state.item.name}
+          </Text>
+          {state.item.concentration && (
+            <Text variant="sub" color={C.sub}>
+              {state.item.concentration}
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity onPress={onCancel} accessibilityLabel="Fechar editor">
+          <Ionicons name="close" size={24} color={C.sub} />
+        </TouchableOpacity>
+      </View>
 
-          <View style={modalStyles.header}>
-            <View style={{ flex: 1 }}>
-              <Text variant="title" numberOfLines={1}>
-                {state.item.name}
-              </Text>
-              {state.item.concentration && (
-                <Text variant="sub" color={C.sub}>
-                  {state.item.concentration}
-                </Text>
-              )}
-            </View>
-            <TouchableOpacity onPress={onCancel} accessibilityLabel="Fechar modal">
-              <Ionicons name="close" size={24} color={C.sub} />
-            </TouchableOpacity>
+      {isSos && (
+        <View
+          style={[
+            modalStyles.sosBanner,
+            { backgroundColor: '#F4A26118', borderColor: '#F4A26144' },
+          ]}
+        >
+          <Ionicons name="alert-circle-outline" size={18} color="#F4A261" />
+          <Text variant="caption" color="#F4A261" style={{ flex: 1, lineHeight: 18 }}>
+            Uso condicional (SOS): tome apenas quando necessário. Nenhum alarme será criado.
+          </Text>
+        </View>
+      )}
+
+      {!isSos && (
+        <View style={modalStyles.section}>
+          <Text variant="caption" color={C.sub} style={modalStyles.sectionLabel}>
+            Frequência detectada
+          </Text>
+          <Text variant="body">{freqLabel}</Text>
+        </View>
+      )}
+
+      {state.item.instructions ? (
+        <View style={modalStyles.section}>
+          <Text variant="caption" color={C.sub} style={modalStyles.sectionLabel}>
+            Instruções da receita
+          </Text>
+          <Text variant="body">{state.item.instructions}</Text>
+        </View>
+      ) : null}
+
+      <View style={modalStyles.section}>
+        <Input
+          label="Dosagem"
+          value={dosage}
+          onChangeText={setDosage}
+          placeholder="Ex: 1 comprimido"
+        />
+      </View>
+
+      {!isSos && (
+        <>
+          <View
+            style={[
+              modalStyles.section,
+              modalStyles.startDateRow,
+              { backgroundColor: C.primary + '12', borderColor: C.primary + '33' },
+            ]}
+          >
+            <Ionicons name="calendar-outline" size={16} color={C.primary} />
+            <Text variant="caption" color={C.primary}>
+              {state.startDate === todayStr()
+                ? `Primeira dose hoje às ${times[0]}`
+                : `Primeira dose amanhã às ${times[0]} — horários de hoje já passaram`}
+            </Text>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-            {isSos && (
-              <View
+          <View style={modalStyles.section}>
+            <Text variant="caption" color={C.sub} style={modalStyles.sectionLabel}>
+              Horários de lembrete
+            </Text>
+            <TimeChipRow
+              times={times}
+              onAdd={t => setTimes(prev => [...prev, t].sort((a, b) => a.localeCompare(b)))}
+              onRemove={t => setTimes(prev => prev.filter(x => x !== t))}
+            />
+          </View>
+
+          <View style={modalStyles.section}>
+            <View style={modalStyles.row}>
+              <Text variant="caption" color={C.sub}>
+                Uso contínuo
+              </Text>
+              <TouchableOpacity
                 style={[
-                  modalStyles.sosBanner,
-                  { backgroundColor: '#F4A26118', borderColor: '#F4A26144' },
+                  modalStyles.toggle,
+                  { backgroundColor: isContinuous ? C.primary : C.border },
                 ]}
+                onPress={toggleContinuous}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: isContinuous }}
               >
-                <Ionicons name="alert-circle-outline" size={18} color="#F4A261" />
-                <Text variant="caption" color="#F4A261" style={{ flex: 1, lineHeight: 18 }}>
-                  Uso condicional (SOS): tome apenas quando necessário. Nenhum alarme será criado.
-                </Text>
-              </View>
-            )}
-
-            {!isSos && (
-              <View style={modalStyles.section}>
-                <Text variant="caption" color={C.sub} style={modalStyles.sectionLabel}>
-                  Frequência detectada
-                </Text>
-                <Text variant="body">{freqLabel}</Text>
-              </View>
-            )}
-
-            {state.item.instructions ? (
-              <View style={modalStyles.section}>
-                <Text variant="caption" color={C.sub} style={modalStyles.sectionLabel}>
-                  Instruções da receita
-                </Text>
-                <Text variant="body">{state.item.instructions}</Text>
-              </View>
-            ) : null}
-
-            <View style={modalStyles.section}>
-              <Input
-                label="Dosagem"
-                value={dosage}
-                onChangeText={setDosage}
-                placeholder="Ex: 1 comprimido"
-              />
+                <View
+                  style={[modalStyles.toggleThumb, isContinuous && modalStyles.toggleThumbOn]}
+                />
+              </TouchableOpacity>
             </View>
 
-            {!isSos && (
-              <>
-                <View
+            {!isContinuous && (
+              <View style={[modalStyles.row, { marginTop: 10 }]}>
+                <Text variant="caption" color={C.sub} style={{ flex: 1 }}>
+                  Duração (dias)
+                </Text>
+                <TextInput
                   style={[
-                    modalStyles.section,
-                    modalStyles.startDateRow,
-                    { backgroundColor: C.primary + '12', borderColor: C.primary + '33' },
+                    modalStyles.durationInput,
+                    { backgroundColor: C.card, borderColor: C.border, color: C.text },
                   ]}
-                >
-                  <Ionicons name="calendar-outline" size={16} color={C.primary} />
-                  <Text variant="caption" color={C.primary}>
-                    {state.startDate === todayStr()
-                      ? `Primeira dose hoje às ${times[0]}`
-                      : `Primeira dose amanhã às ${times[0]} — horários de hoje já passaram`}
-                  </Text>
-                </View>
-
-                <View style={modalStyles.section}>
-                  <Text variant="caption" color={C.sub} style={modalStyles.sectionLabel}>
-                    Horários de lembrete
-                  </Text>
-                  <TimeChipRow
-                    times={times}
-                    onAdd={t => setTimes(prev => [...prev, t].sort())}
-                    onRemove={t => setTimes(prev => prev.filter(x => x !== t))}
-                  />
-                </View>
-
-                <View style={modalStyles.section}>
-                  <View style={modalStyles.row}>
-                    <Text variant="caption" color={C.sub}>
-                      Uso contínuo
-                    </Text>
-                    <TouchableOpacity
-                      style={[
-                        modalStyles.toggle,
-                        { backgroundColor: isContinuous ? C.primary : C.border },
-                      ]}
-                      onPress={toggleContinuous}
-                      accessibilityRole="switch"
-                      accessibilityState={{ checked: isContinuous }}
-                    >
-                      <View
-                        style={[modalStyles.toggleThumb, isContinuous && modalStyles.toggleThumbOn]}
-                      />
-                    </TouchableOpacity>
-                  </View>
-
-                  {!isContinuous && (
-                    <View style={[modalStyles.row, { marginTop: 10 }]}>
-                      <Text variant="caption" color={C.sub} style={{ flex: 1 }}>
-                        Duração (dias)
-                      </Text>
-                      <TextInput
-                        style={[
-                          modalStyles.durationInput,
-                          { backgroundColor: C.card, borderColor: C.border, color: C.text },
-                        ]}
-                        keyboardType="number-pad"
-                        value={durationDays}
-                        onChangeText={setDurationDays}
-                        placeholder="30"
-                        placeholderTextColor={C.sub}
-                      />
-                    </View>
-                  )}
-                </View>
-              </>
+                  keyboardType="number-pad"
+                  value={durationDays}
+                  onChangeText={setDurationDays}
+                  placeholder="30"
+                  placeholderTextColor={C.sub}
+                />
+              </View>
             )}
-          </ScrollView>
+          </View>
+        </>
+      )}
 
-          <Button
-            variant="primary"
-            size="lg"
-            icon={
-              isSos ? (
-                <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
-              ) : (
-                <Ionicons name="alarm-outline" size={20} color="#fff" />
-              )
-            }
-            onPress={handleConfirm}
-            style={modalStyles.saveBtn}
-            accessibilityLabel={
-              isSos ? 'Salvar medicamento SOS' : 'Salvar medicamento e criar alarmes'
-            }
-          >
-            {isSos ? 'Salvar medicamento' : 'Salvar e criar alarmes'}
-          </Button>
-        </View>
+      <View style={modalStyles.actionsRow}>
+        <Button
+          variant="ghost"
+          size="md"
+          onPress={onCancel}
+          style={modalStyles.cancelBtn}
+          accessibilityLabel="Cancelar edição"
+        >
+          Cancelar
+        </Button>
+        <Button
+          variant="primary"
+          size="md"
+          icon={
+            isSos ? (
+              <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+            ) : (
+              <Ionicons name="alarm-outline" size={20} color="#fff" />
+            )
+          }
+          onPress={handleConfirm}
+          style={modalStyles.saveBtn}
+          accessibilityLabel={
+            isSos ? 'Salvar medicamento SOS' : 'Salvar medicamento e criar alarmes'
+          }
+        >
+          {isSos ? 'Salvar medicamento' : 'Salvar e criar alarmes'}
+        </Button>
       </View>
-    </Modal>
+    </Card>
   );
 }
 
 const modalStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: 20,
-    maxHeight: '85%',
-    gap: 4,
+    gap: 6,
   },
-  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 8 },
   section: { marginBottom: 16 },
   sectionLabel: { marginBottom: 6 },
@@ -480,7 +483,6 @@ const modalStyles = StyleSheet.create({
     fontSize: 14,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  saveBtn: { marginTop: 8 },
   startDateRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -499,6 +501,9 @@ const modalStyles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 16,
   },
+  actionsRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  cancelBtn: { flex: 1 },
+  saveBtn: { flex: 2 },
 });
 
 // ─── MedicineResultCard ───────────────────────────────────────────────────────
@@ -619,6 +624,8 @@ export default function ScanPrescriptionScreen() {
   const [fromCache, setFromCache] = useState(false);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [successToast, setSuccessToast] = useState<{ title: string; message: string } | null>(null);
+  const [resetAfterToast, setResetAfterToast] = useState(false);
 
   const C = useTheme();
   const qc = useQueryClient();
@@ -741,6 +748,7 @@ export default function ScanPrescriptionScreen() {
         const schedule = await createSchedule({
           medicineId: medicine.id,
           dosage,
+          doseQuantity: 1,
           frequencyConfig: freqConfig,
           startDate: today,
           endDate,
@@ -778,13 +786,32 @@ export default function ScanPrescriptionScreen() {
         }
       }
 
-      setResults(prev => prev.map(r => (r === item ? { ...r, _saved: true } : r)));
+      const updatedResults = results.map(r => (r === item ? { ...r, _saved: true } : r));
+      setResults(updatedResults);
+      const allSaved = updatedResults.length > 0 && updatedResults.every(r => r._saved === true);
 
       qc.invalidateQueries({ queryKey: ['medicines'] });
       qc.invalidateQueries({ queryKey: ['doses'] });
       qc.invalidateQueries({ queryKey: ['schedules'] });
       qc.invalidateQueries({ queryKey: ['week-adherence'] });
       qc.invalidateQueries({ queryKey: ['streak'] });
+
+      if (allSaved) {
+        setResetAfterToast(true);
+        setSuccessToast({
+          title: 'Receita concluída com sucesso!',
+          message:
+            'Todos os medicamentos detectados foram salvos. Scanner limpo para nova receita.',
+        });
+      } else {
+        setResetAfterToast(false);
+        setSuccessToast({
+          title: isSos ? 'Medicamento salvo com sucesso!' : 'Receita salva com sucesso!',
+          message: isSos
+            ? `${medicine.name} foi adicionado como uso condicional (SOS).`
+            : `${medicine.name} foi adicionado com horários e doses iniciais gerados.`,
+        });
+      }
     } catch (err) {
       Alert.alert('Erro ao salvar', err instanceof Error ? err.message : 'Tente novamente.');
     } finally {
@@ -801,14 +828,6 @@ export default function ScanPrescriptionScreen() {
 
   return (
     <>
-      {confirmState && (
-        <ConfirmModal
-          state={confirmState}
-          onConfirm={handleConfirmSave}
-          onCancel={() => setConfirmState(null)}
-        />
-      )}
-
       <ScrollView
         style={[styles.container, { backgroundColor: C.bg }]}
         contentContainerStyle={styles.content}
@@ -908,6 +927,14 @@ export default function ScanPrescriptionScreen() {
               )}
             </View>
 
+            {confirmState && (
+              <ConfirmInlineEditor
+                state={confirmState}
+                onConfirm={handleConfirmSave}
+                onCancel={() => setConfirmState(null)}
+              />
+            )}
+
             {results.map((item, index) => (
               <MedicineResultCard
                 key={`${item.name}-${index}`}
@@ -932,6 +959,20 @@ export default function ScanPrescriptionScreen() {
           </>
         )}
       </ScrollView>
+
+      <SuccessToast
+        visible={!!successToast}
+        title={successToast?.title ?? ''}
+        message={successToast?.message}
+        preset="normal"
+        onHide={() => {
+          setSuccessToast(null);
+          if (resetAfterToast) {
+            setResetAfterToast(false);
+            reset();
+          }
+        }}
+      />
     </>
   );
 }

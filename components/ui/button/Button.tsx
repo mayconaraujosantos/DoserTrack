@@ -1,4 +1,4 @@
-import { Text } from '@/components/ui/Text';
+import { Text } from '@/components/ui/text/Text';
 import { useTheme } from '@/hooks/use-theme';
 import {
   ActivityIndicator,

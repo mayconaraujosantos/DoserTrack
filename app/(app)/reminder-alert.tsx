@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput } from 'react-native';
-import { Text } from '@/components/ui/Text';
+import { Text } from '@/components/ui/text/Text';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
