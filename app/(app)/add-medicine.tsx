@@ -1,14 +1,15 @@
+import { SuccessToast } from '@/components/ui/SuccessToast';
 import { Text } from '@/components/ui/Text';
 import { DatePickerInput } from '@/components/ui/form/date-picker-input';
 import { TimePickerInput } from '@/components/ui/form/time-picker-input';
 import type { ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
-  createMedicine,
-  createSchedule,
-  generateDosesForSchedule,
-  getDosesForDate,
-  updateDoseNotificationId,
+    createMedicine,
+    createSchedule,
+    generateDosesForSchedule,
+    getDosesForDate,
+    updateDoseNotificationId,
 } from '@/lib/database';
 import { haptic } from '@/lib/haptics';
 import { notifyLowStock, scheduleDoseNotification } from '@/lib/notifications';
@@ -20,20 +21,20 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
-  Alert,
-  Dimensions,
-  Image,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Dimensions,
+    Image,
+    ScrollView,
+    StyleSheet,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+    Easing,
+    useAnimatedStyle,
+    useSharedValue,
+    withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -661,6 +662,8 @@ export default function AddMedicineScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const nameInputRef = useRef<TextInput>(null);
+  const [successToast, setSuccessToast] = useState<{ title: string; message: string } | null>(null);
+  const [backAfterToast, setBackAfterToast] = useState(false);
 
   const slideStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: -stepAnim.value * SCREEN_W }],
@@ -784,9 +787,9 @@ export default function AddMedicineScreen() {
         }
       }
 
-      return medicine;
+      return { medicine, withSchedule };
     },
-    onSuccess: medicine => {
+    onSuccess: ({ medicine, withSchedule }) => {
       haptic.success();
       if (medicine.stockQuantity <= medicine.lowStockThreshold) {
         notifyLowStock(medicine).catch(console.error);
@@ -795,7 +798,13 @@ export default function AddMedicineScreen() {
       qc.invalidateQueries({ queryKey: ['medicines'] });
       qc.invalidateQueries({ queryKey: ['doses'] });
       qc.invalidateQueries({ queryKey: ['schedules'] });
-      router.back();
+      setBackAfterToast(true);
+      setSuccessToast({
+        title: withSchedule ? 'Medicamento e horários salvos!' : 'Medicamento salvo!',
+        message: withSchedule
+          ? `${medicine.name} foi cadastrado e as doses iniciais foram geradas.`
+          : `${medicine.name} foi cadastrado com sucesso.`,
+      });
     },
     onError: (e: Error) => {
       haptic.error();
@@ -808,6 +817,20 @@ export default function AddMedicineScreen() {
 
   return (
     <View style={[main.root, { backgroundColor: C.bg }]}>
+      <SuccessToast
+        visible={!!successToast}
+        title={successToast?.title ?? ''}
+        message={successToast?.message}
+        preset="quick"
+        onHide={() => {
+          setSuccessToast(null);
+          if (backAfterToast) {
+            setBackAfterToast(false);
+            router.back();
+          }
+        }}
+      />
+
       <WizardHeader step={step} onBack={goBack} C={C} topInset={insets.top} />
 
       {/* Strip deslizável com os 3 passos */}

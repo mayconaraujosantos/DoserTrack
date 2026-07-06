@@ -1,5 +1,12 @@
+import { useTheme } from '@/hooks/use-theme';
+import { getMedicines } from '@/lib/database';
+import { useAppStore } from '@/lib/store';
+import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
+import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Modal, View, Pressable, StyleSheet, Text } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -7,11 +14,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '@/hooks/use-theme';
 
 const SPRING = { damping: 26, stiffness: 280, mass: 0.9 };
 
@@ -26,19 +29,24 @@ type ActionItem = {
   color: string;
 };
 
-export function QuickActionsSheet({ visible, onClose }: Props) {
+type SheetMode = 'actions' | 'schedule-prerequisite';
+
+export function QuickActionsSheet({ visible, onClose }: Readonly<Props>) {
   const C = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const dbReady = useAppStore(s => s.dbReady);
 
   // Mantemos o modal montado enquanto anima para fora
   const [modalVisible, setModalVisible] = useState(false);
+  const [mode, setMode] = useState<SheetMode>('actions');
   const translateY = useSharedValue(500);
   const backdropOpacity = useSharedValue(0);
 
   useEffect(() => {
     if (visible) {
       setModalVisible(true);
+      setMode('actions');
       backdropOpacity.value = withTiming(1, { duration: 220 });
       translateY.value = withSpring(0, SPRING);
     } else {
@@ -54,6 +62,12 @@ export function QuickActionsSheet({ visible, onClose }: Props) {
     transform: [{ translateY: translateY.value }],
   }));
 
+  const { data: medicines = [] } = useQuery({
+    queryKey: ['medicines'],
+    queryFn: getMedicines,
+    enabled: dbReady,
+  });
+
   const navigate = useCallback(
     (route: string) => {
       onClose();
@@ -61,6 +75,10 @@ export function QuickActionsSheet({ visible, onClose }: Props) {
     },
     [onClose, router]
   );
+
+  const openSchedulePrerequisite = useCallback(() => {
+    setMode('schedule-prerequisite');
+  }, []);
 
   const actions: ActionItem[] = [
     {
@@ -124,53 +142,114 @@ export function QuickActionsSheet({ visible, onClose }: Props) {
         {/* Drag handle */}
         <View style={[s.handle, { backgroundColor: C.border }]} />
 
-        <Text style={[s.title, { color: C.text }]}>Ações Rápidas</Text>
+        <Text style={[s.title, { color: C.text }]}>
+          {mode === 'actions' ? 'Ações Rápidas' : 'Cadastre um medicamento primeiro'}
+        </Text>
 
-        {/* Grid 2×2 */}
-        <View style={s.grid}>
-          {actions.map(action => (
+        {mode === 'actions' ? (
+          <>
+            <View style={s.grid}>
+              {actions.map(action => (
+                <Pressable
+                  key={action.key}
+                  style={({ pressed }) => [
+                    s.card,
+                    { backgroundColor: action.color + '14', opacity: pressed ? 0.72 : 1 },
+                  ]}
+                  onPress={() => {
+                    if (process.env.EXPO_OS === 'ios') {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }
+                    if (action.key === 'add-sched' && medicines.length === 0) {
+                      openSchedulePrerequisite();
+                      return;
+                    }
+                    navigate(action.route);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.label}
+                >
+                  <View style={[s.iconCircle, { backgroundColor: action.color + '22' }]}>
+                    <Ionicons name={action.icon} size={26} color={action.color} />
+                  </View>
+                  <Text style={[s.cardLabel, { color: C.text }]} numberOfLines={2}>
+                    {action.label}
+                  </Text>
+                  <Text style={[s.cardSub, { color: C.sub }]} numberOfLines={1}>
+                    {action.sub}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <View style={[s.divider, { backgroundColor: C.border }]} />
             <Pressable
-              key={action.key}
-              style={({ pressed }) => [
-                s.card,
-                { backgroundColor: action.color + '14', opacity: pressed ? 0.72 : 1 },
-              ]}
-              onPress={() => {
-                if (process.env.EXPO_OS === 'ios') {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }
-                navigate(action.route);
-              }}
+              style={({ pressed }) => [s.historyRow, { opacity: pressed ? 0.6 : 1 }]}
+              onPress={() => navigate('/(app)/(tabs)/history')}
               accessibilityRole="button"
-              accessibilityLabel={action.label}
+              accessibilityLabel="Ver histórico completo"
             >
-              <View style={[s.iconCircle, { backgroundColor: action.color + '22' }]}>
-                <Ionicons name={action.icon} size={26} color={action.color} />
-              </View>
-              <Text style={[s.cardLabel, { color: C.text }]} numberOfLines={2}>
-                {action.label}
-              </Text>
-              <Text style={[s.cardSub, { color: C.sub }]} numberOfLines={1}>
-                {action.sub}
-              </Text>
+              <Ionicons name="bar-chart-outline" size={20} color={C.sub} />
+              <Text style={[s.historyText, { color: C.sub }]}>Ver histórico completo</Text>
+              <Ionicons name="chevron-forward" size={16} color={C.sub} />
             </Pressable>
-          ))}
-        </View>
+          </>
+        ) : (
+          <View style={s.prereqWrap}>
+            <Text style={[s.prereqText, { color: C.sub }]}>
+              Para criar um agendamento, você precisa ter pelo menos um medicamento cadastrado.
+            </Text>
 
-        {/* Divider + atalho para histórico */}
-        <View style={[s.divider, { backgroundColor: C.border }]} />
-        <Pressable
-          style={({ pressed }) => [s.historyRow, { opacity: pressed ? 0.6 : 1 }]}
-          onPress={() => navigate('/(app)/(tabs)/history')}
-          accessibilityRole="button"
-          accessibilityLabel="Ver histórico completo"
-        >
-          <Ionicons name="bar-chart-outline" size={20} color={C.sub} />
-          <Text style={[s.historyText, { color: C.sub }]}>Ver histórico completo</Text>
-          <Ionicons name="chevron-forward" size={16} color={C.sub} />
-        </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                s.prereqAction,
+                { backgroundColor: C.warning + '14', opacity: pressed ? 0.72 : 1 },
+              ]}
+              onPress={() => navigate('/add-medicine')}
+              accessibilityRole="button"
+              accessibilityLabel="Cadastrar medicamento manualmente"
+            >
+              <View style={[s.iconCircle, { backgroundColor: C.warning + '22' }]}>
+                <Ionicons name="add-circle-outline" size={24} color={C.warning} />
+              </View>
+              <View style={s.prereqCopy}>
+                <Text style={[s.cardLabel, { color: C.text }]}>Cadastrar manualmente</Text>
+                <Text style={[s.cardSub, { color: C.sub }]}>Adicionar nome, dose e estoque</Text>
+              </View>
+            </Pressable>
 
-        {/* Cancelar */}
+            <Pressable
+              style={({ pressed }) => [
+                s.prereqAction,
+                { backgroundColor: C.primary + '14', opacity: pressed ? 0.72 : 1 },
+              ]}
+              onPress={() => navigate('/scan-medicine')}
+              accessibilityRole="button"
+              accessibilityLabel="Escanear embalagem do medicamento"
+            >
+              <View style={[s.iconCircle, { backgroundColor: C.primary + '22' }]}>
+                <Ionicons name="scan-outline" size={24} color={C.primary} />
+              </View>
+              <View style={s.prereqCopy}>
+                <Text style={[s.cardLabel, { color: C.text }]}>Escanear embalagem</Text>
+                <Text style={[s.cardSub, { color: C.sub }]}>
+                  Cadastrar mais rápido com a câmera
+                </Text>
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [s.backRow, { opacity: pressed ? 0.6 : 1 }]}
+              onPress={() => setMode('actions')}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar para ações rápidas"
+            >
+              <Ionicons name="chevron-back" size={16} color={C.sub} />
+              <Text style={[s.historyText, { color: C.sub }]}>Voltar</Text>
+            </Pressable>
+          </View>
+        )}
+
         <Pressable
           style={({ pressed }) => [
             s.cancelBtn,
@@ -266,6 +345,32 @@ const s = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontWeight: '600',
+  },
+  prereqWrap: {
+    gap: 12,
+    marginBottom: 16,
+  },
+  prereqText: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  prereqAction: {
+    borderRadius: 18,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  prereqCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 4,
+    paddingTop: 2,
   },
   cancelBtn: {
     height: 48,

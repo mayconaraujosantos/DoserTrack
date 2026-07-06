@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/form/Input';
+import { SuccessToast } from '@/components/ui/SuccessToast';
 import { Text } from '@/components/ui/Text';
 import { useTheme } from '@/hooks/use-theme';
 import { createMedicine } from '@/lib/database';
@@ -10,18 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -45,8 +36,6 @@ const DEFAULT_UNITS: Record<MedicineType, string> = {
 
 const ALL_TYPES: MedicineType[] = ['tablet', 'capsule', 'drop', 'ml', 'injection', 'other'];
 
-// ─── ConfirmModal ─────────────────────────────────────────────────────────────
-
 interface ConfirmState {
   name: string;
   concentration: string;
@@ -55,21 +44,32 @@ interface ConfirmState {
   stockUnit: string;
 }
 
-function ConfirmModal({
-  state,
-  onConfirm,
-  onCancel,
+function EditableResultCard({
+  data,
+  saved,
+  saving,
+  onSave,
 }: Readonly<{
-  state: ConfirmState;
-  onConfirm: (s: ConfirmState) => void;
-  onCancel: () => void;
+  data: MedicinePackageData;
+  saved: boolean;
+  saving: boolean;
+  onSave: (state: ConfirmState) => void;
 }>) {
   const C = useTheme();
-  const [name, setName] = useState(state.name);
-  const [concentration, setConcentration] = useState(state.concentration);
-  const [type, setType] = useState<MedicineType>(state.type);
-  const [stockQuantity, setStockQuantity] = useState(state.stockQuantity);
-  const [stockUnit, setStockUnit] = useState(state.stockUnit);
+  const initialStock = data.stockQuantity == null ? '0' : String(data.stockQuantity);
+  const [name, setName] = useState(data.name);
+  const [concentration, setConcentration] = useState(data.concentration ?? '');
+  const [type, setType] = useState<MedicineType>(data.type);
+  const [stockQuantity, setStockQuantity] = useState(initialStock);
+  const [stockUnit, setStockUnit] = useState(data.stockUnit ?? DEFAULT_UNITS[data.type]);
+
+  useEffect(() => {
+    setName(data.name);
+    setConcentration(data.concentration ?? '');
+    setType(data.type);
+    setStockQuantity(data.stockQuantity == null ? '0' : String(data.stockQuantity));
+    setStockUnit(data.stockUnit ?? DEFAULT_UNITS[data.type]);
+  }, [data]);
 
   function handleTypeChange(t: MedicineType) {
     setType(t);
@@ -81,176 +81,18 @@ function ConfirmModal({
       Alert.alert('Atenção', 'O nome do medicamento é obrigatório.');
       return;
     }
-    onConfirm({ name, concentration, type, stockQuantity, stockUnit });
+    onSave({ name, concentration, type, stockQuantity, stockUnit });
   }
 
-  return (
-    <Modal visible animationType="slide" transparent onRequestClose={onCancel}>
-      <View style={modalStyles.overlay}>
-        <View style={[modalStyles.sheet, { backgroundColor: C.bg }]}>
-          <View style={[modalStyles.handle, { backgroundColor: C.border }]} />
-
-          <View style={modalStyles.header}>
-            <Text variant="title" style={{ flex: 1 }}>
-              Confirmar medicamento
-            </Text>
-            <TouchableOpacity onPress={onCancel} accessibilityLabel="Fechar modal">
-              <Ionicons name="close" size={24} color={C.sub} />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-            <View style={modalStyles.section}>
-              <Input
-                label="Nome do medicamento"
-                value={name}
-                onChangeText={setName}
-                placeholder="Ex: Paracetamol"
-              />
-            </View>
-
-            <View style={modalStyles.section}>
-              <Input
-                label="Concentração"
-                value={concentration}
-                onChangeText={setConcentration}
-                placeholder="Ex: 750mg"
-              />
-            </View>
-
-            <View style={modalStyles.section}>
-              <Text variant="caption" color={C.sub} style={modalStyles.sectionLabel}>
-                Forma farmacêutica
-              </Text>
-              <View style={modalStyles.typeRow}>
-                {ALL_TYPES.map(t => (
-                  <TouchableOpacity
-                    key={t}
-                    style={[
-                      modalStyles.typeChip,
-                      { borderColor: C.border, backgroundColor: C.card },
-                      type === t && { borderColor: C.primary, backgroundColor: C.primary + '18' },
-                    ]}
-                    onPress={() => handleTypeChange(t)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: type === t }}
-                  >
-                    <Text variant="label" color={type === t ? C.primary : C.sub}>
-                      {TYPE_LABELS[t]}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            <View style={modalStyles.section}>
-              <Text variant="caption" color={C.sub} style={modalStyles.sectionLabel}>
-                Estoque inicial
-              </Text>
-              <View style={modalStyles.stockRow}>
-                <TextInput
-                  style={[
-                    modalStyles.stockInput,
-                    { backgroundColor: C.card, borderColor: C.border, color: C.text },
-                  ]}
-                  keyboardType="numeric"
-                  value={stockQuantity}
-                  onChangeText={setStockQuantity}
-                  placeholder="0"
-                  placeholderTextColor={C.sub}
-                />
-                <TextInput
-                  style={[
-                    modalStyles.unitInput,
-                    { backgroundColor: C.card, borderColor: C.border, color: C.text },
-                  ]}
-                  value={stockUnit}
-                  onChangeText={setStockUnit}
-                  placeholder="unidades"
-                  placeholderTextColor={C.sub}
-                />
-              </View>
-            </View>
-          </ScrollView>
-
-          <Button
-            variant="primary"
-            size="lg"
-            icon={<Ionicons name="checkmark-circle-outline" size={20} color="#fff" />}
-            onPress={handleConfirm}
-            style={modalStyles.saveBtn}
-            accessibilityLabel="Salvar medicamento"
-          >
-            Salvar medicamento
-          </Button>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-const modalStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-    maxHeight: '90%',
-    gap: 4,
-  },
-  handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  section: { marginBottom: 16 },
-  sectionLabel: { marginBottom: 8 },
-  typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  typeChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1.5,
-  },
-  stockRow: { flexDirection: 'row', gap: 10 },
-  stockInput: {
-    width: 80,
-    textAlign: 'center',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 44,
-    fontSize: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  unitInput: {
-    flex: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 44,
-    fontSize: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  saveBtn: { marginTop: 8 },
-});
-
-// ─── ResultCard ───────────────────────────────────────────────────────────────
-
-function ResultCard({
-  data,
-  saved,
-  saving,
-  onAdd,
-}: Readonly<{
-  data: MedicinePackageData;
-  saved: boolean;
-  saving: boolean;
-  onAdd: () => void;
-}>) {
-  const C = useTheme();
+  let saveButtonText = 'Salvar medicamento';
+  if (saving) saveButtonText = 'Salvando...';
+  else if (saved) saveButtonText = 'Medicamento salvo';
 
   return (
     <Card variant="outlined" style={cardStyles.card}>
       <View style={cardStyles.header}>
         <Text variant="title" style={{ flex: 1 }} numberOfLines={1}>
-          {data.name}
-          {data.concentration ? ` ${data.concentration}` : ''}
+          Medicamento identificado
         </Text>
         {saved ? (
           <View style={[cardStyles.badge, { backgroundColor: C.success }]}>
@@ -259,51 +101,88 @@ function ResultCard({
               Salvo
             </Text>
           </View>
-        ) : (
-          <TouchableOpacity
-            style={[cardStyles.badge, { backgroundColor: C.primary }, saving && { opacity: 0.6 }]}
-            onPress={onAdd}
-            disabled={saving}
-            accessibilityLabel={saving ? 'Salvando medicamento' : 'Adicionar medicamento'}
-            accessibilityRole="button"
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Ionicons name="add" size={16} color="#fff" />
-            )}
-            <Text variant="label" color="#fff">
-              {saving ? 'Salvando...' : 'Adicionar'}
-            </Text>
-          </TouchableOpacity>
-        )}
+        ) : null}
       </View>
 
-      <View style={[cardStyles.row, { borderBottomColor: C.border }]}>
-        <Text variant="caption" color={C.sub} style={cardStyles.label}>
-          Forma
-        </Text>
-        <Text variant="label" style={cardStyles.value}>
-          {TYPE_LABELS[data.type] ?? data.type}
-        </Text>
-      </View>
+      <Input
+        label="Nome do medicamento"
+        value={name}
+        onChangeText={setName}
+        placeholder="Ex: Paracetamol"
+      />
 
-      {data.stockQuantity != null && (
-        <View style={[cardStyles.row, { borderBottomColor: C.border }]}>
-          <Text variant="caption" color={C.sub} style={cardStyles.label}>
-            Quantidade na caixa
-          </Text>
-          <Text variant="label" style={cardStyles.value}>
-            {data.stockQuantity} {data.stockUnit ?? ''}
-          </Text>
+      <Input
+        label="Concentração"
+        value={concentration}
+        onChangeText={setConcentration}
+        placeholder="Ex: 750mg"
+      />
+
+      <View>
+        <Text variant="caption" color={C.sub} style={cardStyles.sectionLabel}>
+          Forma farmacêutica
+        </Text>
+        <View style={cardStyles.typeRow}>
+          {ALL_TYPES.map(t => (
+            <TouchableOpacity
+              key={t}
+              style={[
+                cardStyles.typeChip,
+                { borderColor: C.border, backgroundColor: C.card },
+                type === t && { borderColor: C.primary, backgroundColor: C.primary + '18' },
+              ]}
+              onPress={() => handleTypeChange(t)}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: type === t }}
+            >
+              <Text variant="label" color={type === t ? C.primary : C.sub}>
+                {TYPE_LABELS[t]}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-      )}
+      </View>
+
+      <View>
+        <Text variant="caption" color={C.sub} style={cardStyles.sectionLabel}>
+          Estoque inicial
+        </Text>
+        <View style={cardStyles.stockRow}>
+          <Input
+            value={stockQuantity}
+            onChangeText={setStockQuantity}
+            keyboardType="numeric"
+            placeholder="0"
+            style={cardStyles.stockInput}
+          />
+          <Input
+            value={stockUnit}
+            onChangeText={setStockUnit}
+            placeholder="unidades"
+            style={cardStyles.stockUnitInput}
+          />
+        </View>
+      </View>
+
+      <Button
+        variant="primary"
+        size="lg"
+        icon={
+          saving ? undefined : <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+        }
+        onPress={handleConfirm}
+        loading={saving}
+        disabled={saved || saving}
+        accessibilityLabel={saving ? 'Salvando medicamento' : 'Salvar medicamento'}
+      >
+        {saveButtonText}
+      </Button>
     </Card>
   );
 }
 
 const cardStyles = StyleSheet.create({
-  card: { gap: 8 },
+  card: { gap: 10 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   badge: {
     flexDirection: 'row',
@@ -313,15 +192,17 @@ const cardStyles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  sectionLabel: { marginBottom: 8 },
+  typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  typeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1.5,
   },
-  label: { flex: 1 },
-  value: { flex: 2, textAlign: 'right' },
+  stockRow: { flexDirection: 'row', gap: 10 },
+  stockInput: { width: 100 },
+  stockUnitInput: { flex: 1 },
 });
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -333,7 +214,13 @@ export default function ScanMedicineScreen() {
   const [result, setResult] = useState<MedicinePackageData | null>(null);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [successToast, setSuccessToast] = useState<{
+    title: string;
+    message: string;
+    actionLabel?: string;
+    actionMedicineId?: number;
+  } | null>(null);
+  const [resetAfterToast, setResetAfterToast] = useState(false);
 
   const C = useTheme();
   const qc = useQueryClient();
@@ -392,19 +279,7 @@ export default function ScanMedicineScreen() {
     }
   }
 
-  function requestAdd() {
-    if (!result) return;
-    setConfirmState({
-      name: result.name,
-      concentration: result.concentration ?? '',
-      type: result.type,
-      stockQuantity: result.stockQuantity != null ? String(result.stockQuantity) : '0',
-      stockUnit: result.stockUnit ?? DEFAULT_UNITS[result.type],
-    });
-  }
-
-  async function handleConfirmSave(state: ConfirmState) {
-    setConfirmState(null);
+  async function handleSave(state: ConfirmState) {
     setSaving(true);
     try {
       const fullName = state.concentration.trim()
@@ -422,14 +297,14 @@ export default function ScanMedicineScreen() {
 
       setSaved(true);
       qc.invalidateQueries({ queryKey: ['medicines'] });
+      setResetAfterToast(true);
 
-      Alert.alert('Medicamento salvo!', `${fullName} foi adicionado à sua lista.`, [
-        {
-          text: 'Criar horário de alarme',
-          onPress: () => router.push(`/add-schedule?medicineId=${medicine.id}` as never),
-        },
-        { text: 'OK', style: 'cancel' },
-      ]);
+      setSuccessToast({
+        title: 'Medicamento salvo!',
+        message: `${fullName} foi adicionado à sua lista.`,
+        actionLabel: 'Criar horário de alarme',
+        actionMedicineId: medicine.id,
+      });
     } catch (err) {
       Alert.alert('Erro ao salvar', err instanceof Error ? err.message : 'Tente novamente.');
     } finally {
@@ -446,14 +321,6 @@ export default function ScanMedicineScreen() {
 
   return (
     <>
-      {confirmState && (
-        <ConfirmModal
-          state={confirmState}
-          onConfirm={handleConfirmSave}
-          onCancel={() => setConfirmState(null)}
-        />
-      )}
-
       <ScrollView
         style={[styles.container, { backgroundColor: C.bg }]}
         contentContainerStyle={styles.content}
@@ -508,7 +375,7 @@ export default function ScanMedicineScreen() {
             loading={scanning}
             onPress={analyze}
             icon={
-              !scanning ? <Ionicons name="sparkles-outline" size={20} color="#fff" /> : undefined
+              scanning ? undefined : <Ionicons name="sparkles-outline" size={20} color="#fff" />
             }
             style={styles.analyzeBtn}
             accessibilityLabel={
@@ -526,7 +393,7 @@ export default function ScanMedicineScreen() {
               <Text variant="label">Medicamento identificado</Text>
             </View>
 
-            <ResultCard data={result} saved={saved} saving={saving} onAdd={requestAdd} />
+            <EditableResultCard data={result} saved={saved} saving={saving} onSave={handleSave} />
 
             <TouchableOpacity
               style={styles.retryBtn}
@@ -541,6 +408,29 @@ export default function ScanMedicineScreen() {
           </>
         )}
       </ScrollView>
+
+      <SuccessToast
+        visible={!!successToast}
+        title={successToast?.title ?? ''}
+        message={successToast?.message}
+        actionLabel={successToast?.actionLabel}
+        preset="withAction"
+        onAction={() => {
+          if (!successToast?.actionMedicineId) return;
+          const medicineId = successToast.actionMedicineId;
+          setResetAfterToast(false);
+          reset();
+          setSuccessToast(null);
+          router.push(`/add-schedule?medicineId=${medicineId}` as never);
+        }}
+        onHide={() => {
+          setSuccessToast(null);
+          if (resetAfterToast) {
+            setResetAfterToast(false);
+            reset();
+          }
+        }}
+      />
     </>
   );
 }
