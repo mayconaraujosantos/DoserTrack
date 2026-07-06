@@ -142,7 +142,7 @@ O Doser adota arquitetura **local-first**: o SQLite é a fonte de verdade primá
 │   └──────────────────┘  └──────────────────────────┘   │
 ├─────────────────────────────────────────────────────────┤
 │                    Camada de Serviços (lib/)            │
-│   database.ts │ auth.ts │ sync.ts │ notifications.ts   │
+│   database/   │ auth.ts │ sync.ts │ notifications.ts   │
 │   scanner     │ report  │ storage │ biometrics         │
 ├─────────────────────────────────────────────────────────┤
 │                    Camada de Dados                      │
@@ -371,18 +371,26 @@ Espelha o schema SQLite com adição de `user_id` (UUID do Supabase Auth) para m
 
 ## 7. Módulos e Responsabilidades
 
-### `lib/database.ts`
+### `lib/database/`
 
-Única interface com o SQLite. Todas as queries passam por aqui.
+Única interface com o SQLite (importada como `@/lib/database`). Todas as queries passam
+por aqui. Dividida por domínio — sem chamadas cruzadas entre arquivos via função, cada um
+faz SQL/JOIN direto quando precisa de dados de outra tabela:
 
-**Responsabilidades:**
+| Arquivo        | Responsabilidade                                                              |
+| -------------- | ----------------------------------------------------------------------------- |
+| `db.ts`        | Conexão SQLite, `activeProfileId`, migrações (`ensureColumn`), `initDatabase` |
+| `mappers.ts`   | `rowToProfile`/`rowToMedicine`/`rowToSchedule`/`rowToDose` (puros)            |
+| `profiles.ts`  | CRUD de profiles                                                              |
+| `medicines.ts` | CRUD de medicines                                                             |
+| `schedules.ts` | CRUD de schedules                                                             |
+| `doses.ts`     | CRUD/histórico/adesão de doses, geração de doses, realinhamento de intervalo  |
+| `stock.ts`     | Projeção de estoque                                                           |
+| `cache.ts`     | Cache de resultado de scan (`prescription_cache`)                             |
+| `index.ts`     | Reexporta tudo — o import `@/lib/database` não muda para quem consome         |
 
-- Inicialização e migração do banco
-- CRUD de profiles, medicines, schedules, doses
-- Geração de doses a partir de schedules
-- Realinhamento de doses de intervalo
-- Projeção de estoque
-- Métricas de adesão (streak, adherence por dia)
+A geração de doses e a projeção de estoque delegam o cálculo por `FrequencyType` para
+`lib/frequency-strategy.ts` (Strategy — um objeto por tipo, ver ADR correspondente).
 
 **Invariante crítico:** toda função de escrita exige `activeProfileId` configurado via `setActiveProfileId()`. Isso garante isolamento de dados entre perfis.
 
@@ -414,6 +422,8 @@ Sincronização bidirecional SQLite ↔ Supabase.
 - `pullFromCloud()`: download e merge no SQLite local
 - **Conflito:** last-write-wins via `updated_at`
 - Disparado ao abrir o app (foreground) e ao fazer login
+- Tradução linha local ↔ linha da nuvem (Adapter) formalizada em 6 funções puras exportadas
+  (`medicineToCloudRow`/`medicineFromCloudRowParams` e equivalentes para schedule/dose)
 
 ### `lib/notifications.ts`
 
@@ -451,7 +461,11 @@ Autenticação biométrica opcional (fingerprint/Face ID).
 
 ### `lib/medicine-scanner.ts` / `lib/prescription-scanner.ts`
 
-Chamam Supabase Edge Functions que invocam Gemini Vision para extrair dados estruturados de imagens.
+Chamam Supabase Edge Functions que invocam Gemini Vision para extrair dados estruturados de
+imagens. A tradução resposta bruta → tipo de domínio (Adapter) é feita por
+`parseMedicinePackageResponse`/`parsePrescriptionResponse`. `prescription-scanner.ts`
+também expõe `prescriptionItemToFrequencyConfig`, que traduz um item de receita
+(`PrescriptionData`) para o `FrequencyConfig` usado ao criar o schedule.
 
 **Retorno do scan de embalagem:**
 
