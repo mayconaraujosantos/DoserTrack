@@ -1,8 +1,8 @@
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/form/Input';
-import { SuccessToast } from '@/components/ui/SuccessToast';
-import { Text } from '@/components/ui/Text';
+import { Button } from '@/components/ui/button/Button';
+import { Card } from '@/components/ui/card/Card';
+import { Input } from '@/components/ui/input/Input';
+import { SuccessToast } from '@/components/ui/toast/SuccessToast';
+import { Text } from '@/components/ui/text/Text';
 import { useTheme } from '@/hooks/use-theme';
 import { createMedicine } from '@/lib/database';
 import { scanMedicine, type MedicinePackageData } from '@/lib/medicine-scanner';

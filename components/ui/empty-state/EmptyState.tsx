@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/Button';
-import { Text } from '@/components/ui/Text';
+import { Button } from '@/components/ui/button/Button';
+import { Text } from '@/components/ui/text/Text';
 import { useTheme } from '@/hooks/use-theme';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, View, type ViewProps } from 'react-native';

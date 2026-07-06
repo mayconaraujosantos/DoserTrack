@@ -1,8 +1,8 @@
-import { MedicineCardSkeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/Button';
+import { MedicineCardSkeleton } from '@/components/ui/skeleton/skeleton';
+import { Button } from '@/components/ui/button/Button';
 
-import { ScreenHeader, headerBtnStyle } from '@/components/ui/ScreenHeader';
-import { Text } from '@/components/ui/Text';
+import { ScreenHeader, headerBtnStyle } from '@/components/ui/header/ScreenHeader';
+import { Text } from '@/components/ui/text/Text';
 import { useTheme } from '@/hooks/use-theme';
 import { deleteMedicine, getMedicines, getStockProjections } from '@/lib/database';
 import { haptic } from '@/lib/haptics';

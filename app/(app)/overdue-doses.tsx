@@ -1,6 +1,6 @@
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Text } from '@/components/ui/Text';
+import { Button } from '@/components/ui/button/Button';
+import { Card } from '@/components/ui/card/Card';
+import { Text } from '@/components/ui/text/Text';
 import { useTheme } from '@/hooks/use-theme';
 import { getDosesForDate } from '@/lib/database';
 import { useAppStore } from '@/lib/store';

@@ -1,10 +1,10 @@
-import { Button } from '@/components/ui/Button';
-import { DatePickerInput } from '@/components/ui/form/date-picker-input';
-import { Input } from '@/components/ui/form/Input';
-import { TimePickerInput } from '@/components/ui/form/time-picker-input';
-import { IconButton } from '@/components/ui/IconButton';
-import { SuccessToast } from '@/components/ui/SuccessToast';
-import { Text } from '@/components/ui/Text';
+import { Button } from '@/components/ui/button/Button';
+import { DatePickerInput } from '@/components/ui/input/date-picker-input';
+import { Input } from '@/components/ui/input/Input';
+import { TimePickerInput } from '@/components/ui/input/time-picker-input';
+import { IconButton } from '@/components/ui/button/IconButton';
+import { SuccessToast } from '@/components/ui/toast/SuccessToast';
+import { Text } from '@/components/ui/text/Text';
 import { useTheme } from '@/hooks/use-theme';
 import {
   createSchedule,

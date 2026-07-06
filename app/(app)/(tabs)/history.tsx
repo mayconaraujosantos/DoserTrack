@@ -15,11 +15,11 @@ import { getWeekAdherence, getRecentHistory } from '@/lib/database';
 import { generateAdherenceReport } from '@/lib/report';
 import { useAppStore } from '@/lib/store';
 import { useTheme } from '@/hooks/use-theme';
-import { ScreenHeader, headerBtnStyle } from '@/components/ui/ScreenHeader';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Badge, type BadgeVariant } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
-import { Text } from '@/components/ui/Text';
+import { ScreenHeader, headerBtnStyle } from '@/components/ui/header/ScreenHeader';
+import { Skeleton } from '@/components/ui/skeleton/skeleton';
+import { Badge, type BadgeVariant } from '@/components/ui/badge/Badge';
+import { Card } from '@/components/ui/card/Card';
+import { Text } from '@/components/ui/text/Text';
 import type { Dose } from '@/types';
 
 const DAYS_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];

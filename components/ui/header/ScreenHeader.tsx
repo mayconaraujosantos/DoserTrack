@@ -1,7 +1,7 @@
 import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/use-theme';
-import { Text } from './Text';
+import { Text } from '../text/Text';
 import type { ReactNode } from 'react';
 
 interface ScreenHeaderProps {

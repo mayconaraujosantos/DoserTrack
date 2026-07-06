@@ -1,8 +1,8 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/hooks/use-theme';
-import { Text } from '@/components/ui/Text';
-import { Card } from '@/components/ui/Card';
+import { Text } from '@/components/ui/text/Text';
+import { Card } from '@/components/ui/card/Card';
 
 function Section({ title, children }: Readonly<{ title: string; children: React.ReactNode }>) {
   const C = useTheme();

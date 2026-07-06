@@ -1,6 +1,6 @@
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/form/Input';
-import { Text } from '@/components/ui/Text';
+import { Button } from '@/components/ui/button/Button';
+import { Input } from '@/components/ui/input/Input';
+import { Text } from '@/components/ui/text/Text';
 import { useTheme } from '@/hooks/use-theme';
 import { getMedicineById, updateMedicine } from '@/lib/database';
 import { useAppStore } from '@/lib/store';

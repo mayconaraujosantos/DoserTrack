@@ -14,9 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { getDosesForDate, getDatesWithDosesInMonth } from '@/lib/database';
 import { useAppStore } from '@/lib/store';
 import { useTheme } from '@/hooks/use-theme';
-import { ScreenHeader, headerBtnStyle } from '@/components/ui/ScreenHeader';
-import { Text } from '@/components/ui/Text';
-import { Card } from '@/components/ui/Card';
+import { ScreenHeader, headerBtnStyle } from '@/components/ui/header/ScreenHeader';
+import { Text } from '@/components/ui/text/Text';
+import { Card } from '@/components/ui/card/Card';
 import type { Dose } from '@/types';
 
 const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];

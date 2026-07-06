@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getWeekAdherence, getAdherenceStreak } from '@/lib/database';
 import { useAppStore } from '@/lib/store';
 import { useTheme } from '@/hooks/use-theme';
-import { Text } from '@/components/ui/Text';
+import { Text } from '@/components/ui/text/Text';
 
 const DAY_LABELS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 

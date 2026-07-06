@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Text } from './Text';
+import { Text } from '../text/Text';
 
 export type SuccessToastPreset = 'quick' | 'normal' | 'withAction';
 

@@ -1,4 +1,4 @@
-import { Text } from '@/components/ui/Text';
+import { Text } from '@/components/ui/text/Text';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import {
