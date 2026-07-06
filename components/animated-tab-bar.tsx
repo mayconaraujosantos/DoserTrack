@@ -4,13 +4,13 @@ import { Feather, MaterialCommunityIcons, Octicons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
 import React from 'react';
-import { Appearance, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Appearance, StyleSheet, TouchableOpacity, View } from 'react-native';
 
 const BTN_D = 60;
 const CAPSULE_PAD = 10;
 const CAPSULE_GAP = 15;
 const ACTIVE_BG = '#E3E4E9';
-const INACTIVE_BG = '#2B377C99';
+const INACTIVE_BG = '#29377D';
 const NAV_DARK = '#111e4f';
 
 type ActiveTab = 'home' | 'meds' | 'calendar' | 'scan';
@@ -22,6 +22,8 @@ type TabButtonProps = Readonly<{
   onPress: () => void;
   onLongPress: () => void;
 }>;
+
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 function renderTabIcon(activeTab: ActiveTab, isFocused: boolean) {
   const color = isFocused ? '#000000' : '#FFFFFF';
@@ -43,15 +45,42 @@ function renderTabIcon(activeTab: ActiveTab, isFocused: boolean) {
 }
 
 function TabButton({ label, activeTab, isFocused, onPress, onLongPress }: TabButtonProps) {
+  const transition = React.useRef(new Animated.Value(isFocused ? 1 : 0)).current;
+
+  React.useEffect(() => {
+    Animated.spring(transition, {
+      toValue: isFocused ? 1 : 0,
+      stiffness: 185,
+      damping: 14,
+      mass: 0.8,
+      useNativeDriver: true,
+    }).start();
+  }, [isFocused, transition]);
+
   const handlePressIn = () => {
     if (process.env.EXPO_OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 
+  const animatedStyle = {
+    transform: [
+      {
+        scale: transition.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, 1.05],
+        }),
+      },
+    ],
+    backgroundColor: transition.interpolate({
+      inputRange: [0, 1],
+      outputRange: [INACTIVE_BG, ACTIVE_BG],
+    }),
+  };
+
   return (
-    <TouchableOpacity
-      style={[styles.button, isFocused && styles.activeButton]}
+    <AnimatedTouchable
+      style={[styles.button, animatedStyle]}
       onPress={onPress}
       onLongPress={onLongPress}
       onPressIn={handlePressIn}
@@ -61,7 +90,7 @@ function TabButton({ label, activeTab, isFocused, onPress, onLongPress }: TabBut
       accessibilityLabel={label}
     >
       {renderTabIcon(activeTab, isFocused)}
-    </TouchableOpacity>
+    </AnimatedTouchable>
   );
 }
 
@@ -105,7 +134,7 @@ type AnimatedTabBarExtraProps = Readonly<{
 export function AnimatedTabBar(props: Readonly<AnimatedTabBarProps & AnimatedTabBarExtraProps>) {
   const { state, descriptors, navigation, insets } = props;
   const scheme = Appearance.getColorScheme();
-  const wrapperBg = scheme === 'dark' ? '#0b1024' : '#D2D6DE';
+  const wrapperBg = scheme === 'dark' ? '#0b1024' : '#eef0f7';
 
   const routeToActiveTab = (routeName: string): Exclude<ActiveTab, 'scan'> => {
     if (routeName === 'medicines') return 'meds';
@@ -208,6 +237,7 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     padding: CAPSULE_PAD,
     gap: CAPSULE_GAP,
+    overflow: 'hidden',
   },
   singleCapsule: {
     backgroundColor: NAV_DARK,
@@ -234,8 +264,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: INACTIVE_BG,
-  },
-  activeButton: {
-    backgroundColor: ACTIVE_BG,
+    zIndex: 2,
   },
 });
