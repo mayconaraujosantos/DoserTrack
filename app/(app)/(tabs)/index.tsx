@@ -1,18 +1,16 @@
 import { Text } from '@/components/ui/text/Text';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useDosesForDate, useDosesForDateRange } from '@/hooks/use-doses';
+import { useMedicines } from '@/hooks/use-medicines';
 import { useTheme } from '@/hooks/use-theme';
-import {
-  getDosesForDate,
-  getDosesForDateRange,
-  getMedicines,
-  updateDoseStatus,
-} from '@/lib/database';
+import { updateDoseStatus } from '@/lib/database';
 import { haptic } from '@/lib/haptics';
+import { invalidateTrackingQueries } from '@/lib/query-keys';
 import { useAppStore } from '@/lib/store';
 import { syncToCloud } from '@/lib/sync';
 import type { Dose } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -465,7 +463,6 @@ export default function DashboardScreen() {
   const router = useRouter();
   const qc = useQueryClient();
 
-  const dbReady = useAppStore(s => s.dbReady);
   const selectedDate = useAppStore(s => s.selectedDate);
   const setSelectedDate = useAppStore(s => s.setSelectedDate);
   const activeProfile = useAppStore(s => s.activeProfile);
@@ -476,27 +473,9 @@ export default function DashboardScreen() {
   const weekEnd = useMemo(() => weekDays[6]?.dateStr ?? weekAnchor, [weekDays, weekAnchor]);
   const selectedDateObj = useMemo(() => new Date(selectedDate + 'T12:00:00'), [selectedDate]);
 
-  const {
-    data: doses = [],
-    isLoading,
-    refetch,
-  } = useQuery({
-    queryKey: ['doses', selectedDate],
-    queryFn: () => getDosesForDate(selectedDate),
-    enabled: dbReady,
-  });
-
-  const { data: medicines = [] } = useQuery({
-    queryKey: ['medicines'],
-    queryFn: getMedicines,
-    enabled: dbReady,
-  });
-
-  const { data: weekDoses = [] } = useQuery({
-    queryKey: ['week-doses', weekAnchor],
-    queryFn: () => getDosesForDateRange(weekAnchor, weekEnd),
-    enabled: dbReady,
-  });
+  const { data: doses = [], isLoading, refetch } = useDosesForDate(selectedDate);
+  const { data: medicines = [] } = useMedicines();
+  const { data: weekDoses = [] } = useDosesForDateRange(weekAnchor, weekEnd);
 
   const dayStatusMap = useMemo<Record<string, DayStatus>>(() => {
     const byDate = weekDoses.reduce<Record<string, Dose[]>>((acc, dose) => {
@@ -552,9 +531,7 @@ export default function DashboardScreen() {
     onSuccess: () => {
       haptic.success();
       syncToCloud().catch(console.error);
-      qc.invalidateQueries({ queryKey: ['doses'] });
-      qc.invalidateQueries({ queryKey: ['medicines'] });
-      qc.invalidateQueries({ queryKey: ['stock-projections'] });
+      invalidateTrackingQueries(qc);
     },
   });
 
@@ -563,9 +540,7 @@ export default function DashboardScreen() {
     onSuccess: () => {
       haptic.warning();
       syncToCloud().catch(console.error);
-      qc.invalidateQueries({ queryKey: ['doses'] });
-      qc.invalidateQueries({ queryKey: ['medicines'] });
-      qc.invalidateQueries({ queryKey: ['stock-projections'] });
+      invalidateTrackingQueries(qc);
     },
   });
 
