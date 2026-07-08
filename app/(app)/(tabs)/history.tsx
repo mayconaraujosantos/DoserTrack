@@ -11,7 +11,9 @@ import { useQuery } from '@tanstack/react-query';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
-import { getWeekAdherence, getRecentHistory } from '@/lib/database';
+import { useWeekAdherence } from '@/hooks/use-adherence';
+import { getRecentHistory } from '@/lib/database';
+import { queryKeys } from '@/lib/query-keys';
 import { generateAdherenceReport } from '@/lib/report';
 import { useAppStore } from '@/lib/store';
 import { useTheme } from '@/hooks/use-theme';
@@ -154,14 +156,10 @@ export default function HistoryScreen() {
   const dbReady = useAppStore(s => s.dbReady);
   const [exporting, setExporting] = useState(false);
 
-  const { data: adherence = [], isLoading: loadingAdherence } = useQuery({
-    queryKey: ['adherence'],
-    queryFn: getWeekAdherence,
-    enabled: dbReady,
-  });
+  const { data: adherence = [], isLoading: loadingAdherence } = useWeekAdherence();
 
   const { data: history = [], isLoading: loadingHistory } = useQuery({
-    queryKey: ['history'],
+    queryKey: queryKeys.history,
     queryFn: () => getRecentHistory(),
     enabled: dbReady,
   });
