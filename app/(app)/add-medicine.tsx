@@ -13,6 +13,7 @@ import {
 } from '@/lib/database';
 import { haptic } from '@/lib/haptics';
 import { notifyLowStock, scheduleDoseNotification } from '@/lib/notifications';
+import { invalidateTrackingQueries } from '@/lib/query-keys';
 import { syncToCloud } from '@/lib/sync';
 import type { FrequencyConfig, FrequencyType, MedicineType } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
@@ -795,9 +796,7 @@ export default function AddMedicineScreen() {
         notifyLowStock(medicine).catch(console.error);
       }
       syncToCloud().catch(console.error);
-      qc.invalidateQueries({ queryKey: ['medicines'] });
-      qc.invalidateQueries({ queryKey: ['doses'] });
-      qc.invalidateQueries({ queryKey: ['schedules'] });
+      invalidateTrackingQueries(qc);
       setBackAfterToast(true);
       setSuccessToast({
         title: withSchedule ? 'Medicamento e horários salvos!' : 'Medicamento salvo!',
