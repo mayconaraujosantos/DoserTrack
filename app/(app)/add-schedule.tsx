@@ -5,19 +5,19 @@ import { TimePickerInput } from '@/components/ui/input/time-picker-input';
 import { IconButton } from '@/components/ui/button/IconButton';
 import { SuccessToast } from '@/components/ui/toast/SuccessToast';
 import { Text } from '@/components/ui/text/Text';
+import { useMedicines } from '@/hooks/use-medicines';
 import { useTheme } from '@/hooks/use-theme';
 import {
   createSchedule,
   generateDosesForSchedule,
   getDosesForDate,
-  getMedicines,
   updateDoseNotificationId,
 } from '@/lib/database';
 import { scheduleDoseNotification } from '@/lib/notifications';
-import { useAppStore } from '@/lib/store';
+import { invalidateTrackingQueries } from '@/lib/query-keys';
 import type { FrequencyType } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
@@ -120,17 +120,12 @@ export default function AddScheduleScreen() {
 
   const C = useTheme();
   const insets = useSafeAreaInsets();
-  const dbReady = useAppStore(s => s.dbReady);
   const router = useRouter();
   const qc = useQueryClient();
   const [successToast, setSuccessToast] = useState<{ title: string; message: string } | null>(null);
   const [backAfterToast, setBackAfterToast] = useState(false);
 
-  const { data: medicines = [] } = useQuery({
-    queryKey: ['medicines'],
-    queryFn: getMedicines,
-    enabled: dbReady,
-  });
+  const { data: medicines = [] } = useMedicines();
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -173,8 +168,7 @@ export default function AddScheduleScreen() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['doses'] });
-      qc.invalidateQueries({ queryKey: ['schedules'] });
+      invalidateTrackingQueries(qc);
       const medName = medicines.find(m => m.id === selectedMedId)?.name;
       setBackAfterToast(true);
       setSuccessToast({
