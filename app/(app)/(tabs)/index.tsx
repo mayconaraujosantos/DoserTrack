@@ -7,6 +7,7 @@ import {
   getMedicines,
   updateDoseStatus,
 } from '@/lib/database';
+import { DOSE_STATUS_LABEL, getDisplayStatus, type DisplayStatus } from '@/lib/dose-status';
 import { haptic } from '@/lib/haptics';
 import { useAppStore } from '@/lib/store';
 import { syncToCloud } from '@/lib/sync';
@@ -69,23 +70,14 @@ function useHomeColors(): HomeColors {
 
 // ─── Status display ───────────────────────────────────────────────────────────
 
-const STATUS_COLOR = {
+const STATUS_COLOR: Record<DisplayStatus, string> = {
   taken: '#4ECDC4',
   late: '#FF6B6B',
   pending: '#F9C74F',
   snoozed: '#F4A261',
   skipped: '#9294B0',
-} as const;
+};
 
-const STATUS_LABEL = {
-  taken: 'Tomado',
-  late: 'Atrasado',
-  pending: 'Pendente',
-  snoozed: 'Adiado',
-  skipped: 'Pulado',
-} as const;
-
-type DisplayStatus = keyof typeof STATUS_COLOR;
 type FilterKey = 'all' | 'pending' | 'taken' | 'late';
 
 // ─── Day status (for calendar dots) ──────────────────────────────────────────
@@ -139,14 +131,6 @@ function formatTime(iso: string): string {
   });
 }
 
-function getDisplayStatus(dose: Dose): DisplayStatus {
-  if (dose.status === 'taken') return 'taken';
-  if (dose.status === 'skipped') return 'skipped';
-  if (dose.status === 'snoozed') return 'snoozed';
-  if (new Date(dose.scheduledTime) < new Date()) return 'late';
-  return 'pending';
-}
-
 function getSundayOf(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
   d.setDate(d.getDate() - d.getDay());
@@ -191,7 +175,7 @@ function DoseCard({
       onPress={() => onPress(dose.id)}
       activeOpacity={0.82}
       accessibilityRole="button"
-      accessibilityLabel={`${dose.medicineName}, ${STATUS_LABEL[displayStatus]}`}
+      accessibilityLabel={`${dose.medicineName}, ${DOSE_STATUS_LABEL[displayStatus]}`}
       accessibilityState={{ checked: isTaken }}
     >
       <View style={[styles.cardBar, { backgroundColor: color }]} />
@@ -216,7 +200,7 @@ function DoseCard({
           </Text>
         ) : null}
         <View style={[styles.badge, { backgroundColor: color + '22' }]}>
-          <Text style={[styles.badgeText, { color }]}>{STATUS_LABEL[displayStatus]}</Text>
+          <Text style={[styles.badgeText, { color }]}>{DOSE_STATUS_LABEL[displayStatus]}</Text>
         </View>
       </View>
       {canToggle && (
