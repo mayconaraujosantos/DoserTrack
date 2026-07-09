@@ -3,9 +3,9 @@ import { Card } from '@/components/ui/card/Card';
 import { Input } from '@/components/ui/input/Input';
 import { Text } from '@/components/ui/text/Text';
 import { useDoseForm } from '@/hooks/use-dose-form';
+import { useDose } from '@/hooks/use-doses';
 import { useTheme } from '@/hooks/use-theme';
 import {
-  getDoseById,
   getDosesForDate,
   realignIntervalSchedule,
   updateDoseNotificationId,
@@ -13,11 +13,11 @@ import {
   updateDoseStatus,
 } from '@/lib/database';
 import { scheduleDoseNotification } from '@/lib/notifications';
-import { useAppStore } from '@/lib/store';
+import { invalidateTrackingQueries } from '@/lib/query-keys';
 import type { DoseStatus } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   ActivityIndicator,
@@ -89,15 +89,10 @@ export default function EditDoseScreen() {
 
   const C = useTheme();
   const insets = useSafeAreaInsets();
-  const dbReady = useAppStore(s => s.dbReady);
   const router = useRouter();
   const qc = useQueryClient();
 
-  const { data: dose, isLoading } = useQuery({
-    queryKey: ['dose', doseId],
-    queryFn: () => getDoseById(doseId),
-    enabled: dbReady && doseId > 0,
-  });
+  const { data: dose, isLoading } = useDose(doseId);
 
   const {
     status,
@@ -136,11 +131,7 @@ export default function EditDoseScreen() {
       return { realigned: false };
     },
     onSuccess: ({ realigned }) => {
-      qc.invalidateQueries({ queryKey: ['doses'] });
-      qc.invalidateQueries({ queryKey: ['dose', doseId] });
-      qc.invalidateQueries({ queryKey: ['history'] });
-      qc.invalidateQueries({ queryKey: ['adherence'] });
-      qc.invalidateQueries({ queryKey: ['schedules'] });
+      invalidateTrackingQueries(qc);
       if (realigned) {
         Alert.alert(
           'Horários realinhados',
