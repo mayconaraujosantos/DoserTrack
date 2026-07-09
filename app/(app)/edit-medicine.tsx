@@ -1,12 +1,13 @@
 import { Button } from '@/components/ui/button/Button';
 import { Input } from '@/components/ui/input/Input';
 import { Text } from '@/components/ui/text/Text';
+import { useMedicine } from '@/hooks/use-medicines';
 import { useTheme } from '@/hooks/use-theme';
-import { getMedicineById, updateMedicine } from '@/lib/database';
-import { useAppStore } from '@/lib/store';
+import { updateMedicine } from '@/lib/database';
+import { invalidateTrackingQueries } from '@/lib/query-keys';
 import type { MedicineType } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -51,15 +52,10 @@ export default function EditMedicineScreen() {
 
   const C = useTheme();
   const insets = useSafeAreaInsets();
-  const dbReady = useAppStore(s => s.dbReady);
   const router = useRouter();
   const qc = useQueryClient();
 
-  const { data: medicine, isLoading } = useQuery({
-    queryKey: ['medicine', medicineId],
-    queryFn: () => getMedicineById(medicineId),
-    enabled: dbReady && medicineId > 0,
-  });
+  const { data: medicine, isLoading } = useMedicine(medicineId);
 
   useEffect(() => {
     if (!medicine) return;
@@ -81,8 +77,7 @@ export default function EditMedicineScreen() {
         lowStockThreshold: Number.parseFloat(threshold) || 5,
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['medicines'] });
-      qc.invalidateQueries({ queryKey: ['medicine', medicineId] });
+      invalidateTrackingQueries(qc);
       router.back();
     },
     onError: () => Alert.alert('Erro', 'Não foi possível salvar as alterações.'),
