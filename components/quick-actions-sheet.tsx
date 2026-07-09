@@ -1,8 +1,6 @@
+import { useMedicines } from '@/hooks/use-medicines';
 import { useTheme } from '@/hooks/use-theme';
-import { getMedicines } from '@/lib/database';
-import { useAppStore } from '@/lib/store';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -35,7 +33,6 @@ export function QuickActionsSheet({ visible, onClose }: Readonly<Props>) {
   const C = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const dbReady = useAppStore(s => s.dbReady);
 
   // Mantemos o modal montado enquanto anima para fora
   const [modalVisible, setModalVisible] = useState(false);
@@ -62,11 +59,7 @@ export function QuickActionsSheet({ visible, onClose }: Readonly<Props>) {
     transform: [{ translateY: translateY.value }],
   }));
 
-  const { data: medicines = [] } = useQuery({
-    queryKey: ['medicines'],
-    queryFn: getMedicines,
-    enabled: dbReady,
-  });
+  const { data: medicines = [] } = useMedicines();
 
   const navigate = useCallback(
     (route: string) => {
