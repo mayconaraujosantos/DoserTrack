@@ -4,15 +4,10 @@ import { DatePickerInput } from '@/components/ui/input/date-picker-input';
 import { TimePickerInput } from '@/components/ui/input/time-picker-input';
 import type { ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import {
-  createMedicine,
-  createSchedule,
-  generateDosesForSchedule,
-  getDosesForDate,
-  updateDoseNotificationId,
-} from '@/lib/database';
+import { createMedicine, createSchedule } from '@/lib/database';
+import { finalizeNewSchedule } from '@/lib/dose-scheduling';
 import { haptic } from '@/lib/haptics';
-import { notifyLowStock, scheduleDoseNotification } from '@/lib/notifications';
+import { notifyLowStock } from '@/lib/notifications';
 import { invalidateTrackingQueries } from '@/lib/query-keys';
 import { syncToCloud } from '@/lib/sync';
 import type { FrequencyConfig, FrequencyType, MedicineType } from '@/types';
@@ -767,25 +762,7 @@ export default function AddMedicineScreen() {
           isActive: true,
         });
 
-        await generateDosesForSchedule(schedule, 30);
-
-        const now = new Date();
-        for (let i = 0; i < 7; i++) {
-          const d = new Date(now);
-          d.setDate(d.getDate() + i);
-          const doses = await getDosesForDate(d.toISOString().split('T')[0]);
-          for (const dose of doses) {
-            if (dose.scheduleId === schedule.id && new Date(dose.scheduledTime) > now) {
-              const notifId = await scheduleDoseNotification({
-                id: dose.id,
-                medicineName: medicine.name,
-                dosage: schedule.dosage,
-                scheduledTime: dose.scheduledTime,
-              });
-              if (notifId) await updateDoseNotificationId(dose.id, notifId);
-            }
-          }
-        }
+        await finalizeNewSchedule(schedule, medicine.name);
       }
 
       return { medicine, withSchedule };

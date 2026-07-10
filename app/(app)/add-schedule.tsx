@@ -7,13 +7,8 @@ import { SuccessToast } from '@/components/ui/toast/SuccessToast';
 import { Text } from '@/components/ui/text/Text';
 import { useMedicines } from '@/hooks/use-medicines';
 import { useTheme } from '@/hooks/use-theme';
-import {
-  createSchedule,
-  generateDosesForSchedule,
-  getDosesForDate,
-  updateDoseNotificationId,
-} from '@/lib/database';
-import { scheduleDoseNotification } from '@/lib/notifications';
+import { createSchedule } from '@/lib/database';
+import { finalizeNewSchedule } from '@/lib/dose-scheduling';
 import { invalidateTrackingQueries } from '@/lib/query-keys';
 import type { FrequencyType } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
@@ -145,27 +140,8 @@ export default function AddScheduleScreen() {
         isActive: true,
       });
 
-      await generateDosesForSchedule(schedule, 30);
-
       const medName = medicines.find(m => m.id === selectedMedId)?.name ?? '';
-      const now = new Date();
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(now);
-        d.setDate(d.getDate() + i);
-        const dateStr = d.toISOString().split('T')[0];
-        const doses = await getDosesForDate(dateStr);
-        for (const dose of doses) {
-          if (dose.scheduleId === schedule.id && new Date(dose.scheduledTime) > now) {
-            const notifId = await scheduleDoseNotification({
-              id: dose.id,
-              medicineName: medName,
-              dosage: schedule.dosage,
-              scheduledTime: dose.scheduledTime,
-            });
-            if (notifId) await updateDoseNotificationId(dose.id, notifId);
-          }
-        }
-      }
+      await finalizeNewSchedule(schedule, medName);
     },
     onSuccess: () => {
       invalidateTrackingQueries(qc);

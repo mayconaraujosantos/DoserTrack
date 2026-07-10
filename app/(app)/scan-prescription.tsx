@@ -4,15 +4,8 @@ import { Input } from '@/components/ui/input/Input';
 import { SuccessToast } from '@/components/ui/toast/SuccessToast';
 import { Text } from '@/components/ui/text/Text';
 import { useTheme } from '@/hooks/use-theme';
-import {
-  createMedicine,
-  createSchedule,
-  generateDosesForSchedule,
-  getDosesForDate,
-  updateDoseNotificationId,
-  updateDoseStatus,
-} from '@/lib/database';
-import { scheduleDoseNotification } from '@/lib/notifications';
+import { createMedicine, createSchedule } from '@/lib/database';
+import { finalizeNewSchedule } from '@/lib/dose-scheduling';
 import { invalidateTrackingQueries } from '@/lib/query-keys';
 import { scanPrescription, type PrescriptionData } from '@/lib/prescription-scanner';
 import { cachePrescription, clearPrescriptionCache, getCachedPrescription } from '@/lib/scan-cache';
@@ -756,35 +749,7 @@ export default function ScanPrescriptionScreen() {
           isActive: true,
         });
 
-        await generateDosesForSchedule(schedule, 30);
-
-        // Marca como skipped doses já passadas no dia de hoje para evitar status "atrasado" imediato
-        const now = new Date();
-        const realToday = todayStr();
-        const todayDoses = await getDosesForDate(realToday);
-        for (const dose of todayDoses) {
-          if (dose.scheduleId === schedule.id && new Date(dose.scheduledTime) <= now) {
-            await updateDoseStatus(dose.id, 'skipped');
-          }
-        }
-
-        for (let i = 0; i < 7; i++) {
-          const d = new Date(now);
-          d.setDate(d.getDate() + i);
-          const dateStr = d.toISOString().split('T')[0];
-          const doses = await getDosesForDate(dateStr);
-          for (const dose of doses) {
-            if (dose.scheduleId === schedule.id && new Date(dose.scheduledTime) > now) {
-              const notifId = await scheduleDoseNotification({
-                id: dose.id,
-                medicineName: medicine.name,
-                dosage: schedule.dosage,
-                scheduledTime: dose.scheduledTime,
-              });
-              if (notifId) await updateDoseNotificationId(dose.id, notifId);
-            }
-          }
-        }
+        await finalizeNewSchedule(schedule, medicine.name);
       }
 
       const updatedResults = results.map(r => (r === item ? { ...r, _saved: true } : r));
