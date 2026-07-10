@@ -5,11 +5,11 @@ import { TimePickerInput } from '@/components/ui/input/time-picker-input';
 import type { ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
-    createMedicine,
-    createSchedule,
-    generateDosesForSchedule,
-    getDosesForDate,
-    updateDoseNotificationId,
+  createMedicine,
+  createSchedule,
+  generateDosesForSchedule,
+  getDosesForDate,
+  updateDoseNotificationId,
 } from '@/lib/database';
 import { haptic } from '@/lib/haptics';
 import { notifyLowStock, scheduleDoseNotification } from '@/lib/notifications';
@@ -22,20 +22,20 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    Image,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Dimensions,
+  Image,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import Animated, {
-    Easing,
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
