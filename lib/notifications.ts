@@ -1,3 +1,5 @@
+import { isOverdue } from '@/lib/dose-status';
+import type { Dose } from '@/types';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 
@@ -158,18 +160,13 @@ export function addNotificationResponseListener(
   return N.addNotificationResponseReceivedListener(callback);
 }
 
-export async function checkOverdueDoses(): Promise<{ count: number; doses: any[] }> {
+export async function checkOverdueDoses(): Promise<{ count: number; doses: Dose[] }> {
   try {
     const { getDosesForDate } = await import('@/lib/database');
 
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
     const doses = await getDosesForDate(today);
-
-    const overdue = doses.filter(d => {
-      const scheduled = new Date(d.scheduledTime);
-      return scheduled < now && d.status !== 'taken' && d.status !== 'skipped';
-    });
+    const overdue = doses.filter(d => isOverdue(d));
 
     return { count: overdue.length, doses: overdue };
   } catch {

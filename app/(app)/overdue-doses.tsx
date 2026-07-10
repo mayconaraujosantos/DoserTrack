@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card/Card';
 import { Text } from '@/components/ui/text/Text';
 import { useDosesForDate } from '@/hooks/use-doses';
 import { useTheme } from '@/hooks/use-theme';
+import { isOverdue } from '@/lib/dose-status';
 import { invalidateTrackingQueries } from '@/lib/query-keys';
 import type { Dose } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,12 +38,7 @@ export default function OverdueScreen() {
 
   useEffect(() => {
     if (!todayDoses) return;
-    const now = new Date();
-    const overdue = todayDoses.filter(d => {
-      const scheduled = new Date(d.scheduledTime);
-      return scheduled < now && d.status !== 'taken' && d.status !== 'skipped';
-    });
-    setOverdueDoses(overdue);
+    setOverdueDoses(todayDoses.filter(d => isOverdue(d)));
   }, [todayDoses]);
 
   function handleDosePress(doseId: number) {

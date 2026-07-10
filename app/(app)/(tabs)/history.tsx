@@ -13,6 +13,7 @@ import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
 import { useWeekAdherence } from '@/hooks/use-adherence';
 import { getRecentHistory } from '@/lib/database';
+import { DOSE_STATUS_LABEL } from '@/lib/dose-status';
 import { queryKeys } from '@/lib/query-keys';
 import { generateAdherenceReport } from '@/lib/report';
 import { useAppStore } from '@/lib/store';
@@ -56,13 +57,6 @@ function doseStatusBadgeVariant(status: Dose['status']): BadgeVariant {
   if (status === 'skipped') return 'danger';
   if (status === 'snoozed') return 'warning';
   return 'neutral';
-}
-
-function doseStatusLabel(status: Dose['status']): string {
-  if (status === 'taken') return 'Tomado';
-  if (status === 'skipped') return 'Pulado';
-  if (status === 'snoozed') return 'Soneca';
-  return 'Pendente';
 }
 
 function sectionDateLabel(dateStr: string): string {
@@ -115,7 +109,7 @@ function HistoryItem({ item }: Readonly<{ item: Dose }>) {
     <TouchableOpacity
       style={[styles.historyRow, { backgroundColor: C.card }]}
       activeOpacity={0.75}
-      accessibilityLabel={`${item.medicineName}, ${doseStatusLabel(item.status)}, ${formatTime(item.scheduledTime)}`}
+      accessibilityLabel={`${item.medicineName}, ${DOSE_STATUS_LABEL[item.status]}, ${formatTime(item.scheduledTime)}`}
     >
       <View style={[styles.statusBar, { backgroundColor: dotColor }]} />
 
@@ -144,7 +138,7 @@ function HistoryItem({ item }: Readonly<{ item: Dose }>) {
         </View>
       </View>
 
-      <Badge variant={doseStatusBadgeVariant(item.status)} label={doseStatusLabel(item.status)} />
+      <Badge variant={doseStatusBadgeVariant(item.status)} label={DOSE_STATUS_LABEL[item.status]} />
     </TouchableOpacity>
   );
 }
