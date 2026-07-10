@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { View, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput } from 'react-native';
 import { Text } from '@/components/ui/text/Text';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { getDoseById, updateDoseStatus } from '@/lib/database';
+import { updateDoseStatus } from '@/lib/database';
 import { scheduleSnoozeNotification, cancelNotification } from '@/lib/notifications';
 import { haptic } from '@/lib/haptics';
-import { useAppStore } from '@/lib/store';
+import { useDose } from '@/hooks/use-doses';
+import { invalidateTrackingQueries } from '@/lib/query-keys';
 
 // This screen always uses a dark overlay regardless of OS theme
 const DARK = {
@@ -152,17 +153,12 @@ export default function ReminderAlertScreen() {
   const [showSkipReason, setShowSkipReason] = useState(false);
   const [skipReason, setSkipReason] = useState('');
   const [selectedSnooze, setSelectedSnooze] = useState(10);
-  const dbReady = useAppStore(s => s.dbReady);
   const router = useRouter();
   const qc = useQueryClient();
 
   const id = doseId ? Number.parseInt(doseId) : 0;
 
-  const { data: dose, isLoading } = useQuery({
-    queryKey: ['dose', id],
-    queryFn: () => getDoseById(id),
-    enabled: dbReady && id > 0,
-  });
+  const { data: dose, isLoading } = useDose(id);
 
   const takeMutation = useMutation({
     mutationFn: async () => {
@@ -171,7 +167,7 @@ export default function ReminderAlertScreen() {
     },
     onSuccess: () => {
       haptic.success();
-      qc.invalidateQueries({ queryKey: ['doses'] });
+      invalidateTrackingQueries(qc);
       router.back();
     },
   });
@@ -192,7 +188,7 @@ export default function ReminderAlertScreen() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['doses'] });
+      invalidateTrackingQueries(qc);
       router.back();
     },
   });
@@ -203,7 +199,7 @@ export default function ReminderAlertScreen() {
       await updateDoseStatus(id, 'skipped', undefined, skipReason || undefined);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['doses'] });
+      invalidateTrackingQueries(qc);
       router.back();
     },
   });

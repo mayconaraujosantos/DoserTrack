@@ -5,14 +5,15 @@ import { TimePickerInput } from '@/components/ui/input/time-picker-input';
 import type { ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
-    createMedicine,
-    createSchedule,
-    generateDosesForSchedule,
-    getDosesForDate,
-    updateDoseNotificationId,
+  createMedicine,
+  createSchedule,
+  generateDosesForSchedule,
+  getDosesForDate,
+  updateDoseNotificationId,
 } from '@/lib/database';
 import { haptic } from '@/lib/haptics';
 import { notifyLowStock, scheduleDoseNotification } from '@/lib/notifications';
+import { invalidateTrackingQueries } from '@/lib/query-keys';
 import { syncToCloud } from '@/lib/sync';
 import type { FrequencyConfig, FrequencyType, MedicineType } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,20 +22,20 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    Image,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Dimensions,
+  Image,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import Animated, {
-    Easing,
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -795,9 +796,7 @@ export default function AddMedicineScreen() {
         notifyLowStock(medicine).catch(console.error);
       }
       syncToCloud().catch(console.error);
-      qc.invalidateQueries({ queryKey: ['medicines'] });
-      qc.invalidateQueries({ queryKey: ['doses'] });
-      qc.invalidateQueries({ queryKey: ['schedules'] });
+      invalidateTrackingQueries(qc);
       setBackAfterToast(true);
       setSuccessToast({
         title: withSchedule ? 'Medicamento e horários salvos!' : 'Medicamento salvo!',

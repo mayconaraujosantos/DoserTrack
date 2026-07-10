@@ -23,6 +23,7 @@ bun run format
 | Rodar no iOS                   | `bun run ios`           |
 | Rodar na Web                   | `bun run web`           |
 | Lint (ESLint)                  | `bun run lint`          |
+| Verificar tipos (TypeScript)   | `bun run typecheck`     |
 | Formatar código (Prettier)     | `bun run format`        |
 | Verificar formatação           | `bun run format:check`  |
 | Rodar testes                   | `bun run test`          |

@@ -3,13 +3,15 @@ import { Button } from '@/components/ui/button/Button';
 
 import { ScreenHeader, headerBtnStyle } from '@/components/ui/header/ScreenHeader';
 import { Text } from '@/components/ui/text/Text';
+import { useMedicines } from '@/hooks/use-medicines';
+import { useStockProjections } from '@/hooks/use-stock-projections';
 import { useTheme } from '@/hooks/use-theme';
-import { deleteMedicine, getMedicines, getStockProjections } from '@/lib/database';
+import { deleteMedicine } from '@/lib/database';
 import { haptic } from '@/lib/haptics';
-import { useAppStore } from '@/lib/store';
+import { invalidateTrackingQueries } from '@/lib/query-keys';
 import type { Medicine, MedicineType, StockProjection } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -196,29 +198,17 @@ export default function MedicinesScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const C = useTheme();
-  const dbReady = useAppStore(s => s.dbReady);
   const router = useRouter();
   const qc = useQueryClient();
 
-  const { data: medicines = [], isLoading } = useQuery({
-    queryKey: ['medicines'],
-    queryFn: getMedicines,
-    enabled: dbReady,
-  });
-
-  const { data: projections = {} } = useQuery({
-    queryKey: ['stock-projections'],
-    queryFn: getStockProjections,
-    enabled: dbReady,
-  });
+  const { data: medicines = [], isLoading } = useMedicines();
+  const { data: projections = {} } = useStockProjections();
 
   const deleteMutation = useMutation({
     mutationFn: deleteMedicine,
     onSuccess: () => {
       haptic.warning();
-      qc.invalidateQueries({ queryKey: ['medicines'] });
-      qc.invalidateQueries({ queryKey: ['doses'] });
-      qc.invalidateQueries({ queryKey: ['schedules'] });
+      invalidateTrackingQueries(qc);
     },
   });
 

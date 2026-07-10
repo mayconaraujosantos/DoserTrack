@@ -13,6 +13,7 @@ import {
   updateDoseStatus,
 } from '@/lib/database';
 import { scheduleDoseNotification } from '@/lib/notifications';
+import { invalidateTrackingQueries } from '@/lib/query-keys';
 import { scanPrescription, type PrescriptionData } from '@/lib/prescription-scanner';
 import { cachePrescription, clearPrescriptionCache, getCachedPrescription } from '@/lib/scan-cache';
 import { Ionicons } from '@expo/vector-icons';
@@ -790,11 +791,7 @@ export default function ScanPrescriptionScreen() {
       setResults(updatedResults);
       const allSaved = updatedResults.length > 0 && updatedResults.every(r => r._saved === true);
 
-      qc.invalidateQueries({ queryKey: ['medicines'] });
-      qc.invalidateQueries({ queryKey: ['doses'] });
-      qc.invalidateQueries({ queryKey: ['schedules'] });
-      qc.invalidateQueries({ queryKey: ['week-adherence'] });
-      qc.invalidateQueries({ queryKey: ['streak'] });
+      invalidateTrackingQueries(qc);
 
       if (allSaved) {
         setResetAfterToast(true);

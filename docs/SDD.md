@@ -745,6 +745,20 @@ Configuração em `eas.json`. Profiles: `development`, `preview`, `production`.
 - **pre-commit:** lint-staged (ESLint + Prettier nos arquivos staged)
 - **commit-msg:** commitlint (conventional commits: `feat:`, `fix:`, `refactor:`, etc.)
 
+### CI/CD (GitHub Actions)
+
+- **`.github/workflows/ci.yml`** — quality gate automático em todo Pull Request e em todo
+  push para `main`/`develop`: `bun run lint`, `bun run typecheck`, `bun run format:check`,
+  `bun run test`, nessa ordem, num único job `quality` em `ubuntu-latest`.
+- **`.github/workflows/eas-build-android.yml`** — build nativo Android via EAS, disparado
+  manualmente (`workflow_dispatch`, aba Actions do GitHub), com escolha do profile de
+  `eas.json` (`development`, `preview`, `preview2`, `preview3`, `production`, `apk`). Não
+  roda automaticamente em push/PR — evita gastar crédito de build sem intenção explícita.
+  iOS e submit às lojas (Play/App Store) ficam fora do escopo por enquanto.
+  **Pré-requisito:** secret do repositório `EXPO_TOKEN` (gerado em
+  [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens)), sem o qual a
+  etapa de autenticação do EAS CLI falha.
+
 ---
 
 ## 13. Decisões de Design (ADRs)

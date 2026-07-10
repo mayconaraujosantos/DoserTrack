@@ -1,12 +1,12 @@
 import { Button } from '@/components/ui/button/Button';
 import { Card } from '@/components/ui/card/Card';
 import { Text } from '@/components/ui/text/Text';
+import { useDosesForDate } from '@/hooks/use-doses';
 import { useTheme } from '@/hooks/use-theme';
-import { getDosesForDate } from '@/lib/database';
-import { useAppStore } from '@/lib/store';
+import { invalidateTrackingQueries } from '@/lib/query-keys';
 import type { Dose } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
@@ -30,18 +30,10 @@ export default function OverdueScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const qc = useQueryClient();
-  const dbReady = useAppStore(s => s.dbReady);
 
   const [overdueDoses, setOverdueDoses] = useState<Dose[]>([]);
 
-  const { data: todayDoses, isLoading } = useQuery({
-    queryKey: ['doses', 'today'],
-    queryFn: async () => {
-      const today = toLocalDateStr(new Date());
-      return getDosesForDate(today);
-    },
-    enabled: dbReady,
-  });
+  const { data: todayDoses, isLoading } = useDosesForDate(toLocalDateStr(new Date()));
 
   useEffect(() => {
     if (!todayDoses) return;
@@ -61,7 +53,7 @@ export default function OverdueScreen() {
   }
 
   function handleClose() {
-    qc.invalidateQueries({ queryKey: ['doses'] });
+    invalidateTrackingQueries(qc);
     router.back();
   }
 

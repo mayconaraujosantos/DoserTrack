@@ -6,6 +6,7 @@ import { Text } from '@/components/ui/text/Text';
 import { useTheme } from '@/hooks/use-theme';
 import { createMedicine } from '@/lib/database';
 import { scanMedicine, type MedicinePackageData } from '@/lib/medicine-scanner';
+import { invalidateTrackingQueries } from '@/lib/query-keys';
 import type { MedicineType } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
@@ -296,7 +297,7 @@ export default function ScanMedicineScreen() {
       });
 
       setSaved(true);
-      qc.invalidateQueries({ queryKey: ['medicines'] });
+      invalidateTrackingQueries(qc);
       setResetAfterToast(true);
 
       setSuccessToast({

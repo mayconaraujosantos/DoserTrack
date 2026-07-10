@@ -9,11 +9,10 @@ import {
 } from 'react-native';
 
 import { useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { getDosesForDate, getDatesWithDosesInMonth } from '@/lib/database';
-import { useAppStore } from '@/lib/store';
+import { useDatesWithDosesInMonth, useDosesForDate } from '@/hooks/use-doses';
 import { useTheme } from '@/hooks/use-theme';
+import { useAppStore } from '@/lib/store';
 import { ScreenHeader, headerBtnStyle } from '@/components/ui/header/ScreenHeader';
 import { Text } from '@/components/ui/text/Text';
 import { Card } from '@/components/ui/card/Card';
@@ -99,20 +98,13 @@ export default function ScheduleScreen() {
 
   const selectedDate = useAppStore(s => s.selectedDate);
   const setSelectedDate = useAppStore(s => s.setSelectedDate);
-  const dbReady = useAppStore(s => s.dbReady);
   const router = useRouter();
 
-  const { data: doses = [], isLoading } = useQuery({
-    queryKey: ['doses', selectedDate],
-    queryFn: () => getDosesForDate(selectedDate),
-    enabled: dbReady,
-  });
-
-  const { data: datesWithDoses = new Set<string>() } = useQuery({
-    queryKey: ['datesWithDoses', viewYear, viewMonth],
-    queryFn: () => getDatesWithDosesInMonth(viewYear, viewMonth),
-    enabled: dbReady,
-  });
+  const { data: doses = [], isLoading } = useDosesForDate(selectedDate);
+  const { data: datesWithDoses = new Set<string>() } = useDatesWithDosesInMonth(
+    viewYear,
+    viewMonth
+  );
 
   function prevMonth() {
     if (viewMonth === 0) {

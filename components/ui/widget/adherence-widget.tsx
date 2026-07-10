@@ -1,9 +1,7 @@
 import { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
-import { getWeekAdherence, getAdherenceStreak } from '@/lib/database';
-import { useAppStore } from '@/lib/store';
+import { useAdherenceStreak, useWeekAdherence } from '@/hooks/use-adherence';
 import { useTheme } from '@/hooks/use-theme';
 import { Text } from '@/components/ui/text/Text';
 
@@ -24,19 +22,9 @@ function rateColor(
 
 export function AdherenceWidget() {
   const C = useTheme();
-  const dbReady = useAppStore(s => s.dbReady);
 
-  const { data: week = [] } = useQuery({
-    queryKey: ['week-adherence'],
-    queryFn: getWeekAdherence,
-    enabled: dbReady,
-  });
-
-  const { data: streak = 0 } = useQuery({
-    queryKey: ['streak'],
-    queryFn: getAdherenceStreak,
-    enabled: dbReady,
-  });
+  const { data: week = [] } = useWeekAdherence();
+  const { data: streak = 0 } = useAdherenceStreak();
 
   const last7 = useMemo(() => {
     const map = new Map(week.map(d => [d.date, d]));
