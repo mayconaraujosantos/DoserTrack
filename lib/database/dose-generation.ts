@@ -42,6 +42,50 @@ export async function generateDosesForSchedule(schedule: Schedule, daysAhead = 3
 }
 
 /**
+ * Cancela notificações e apaga doses `pending` futuras de um schedule —
+ * usada antes de regenerar doses sob uma nova configuração (realinhamento
+ * de horário ou edição do schedule), para não deixar doses órfãs geradas
+ * sob a config antiga.
+ */
+async function deleteFuturePendingDoses(
+  scheduleId: number,
+  profileId: number,
+  after: Date
+): Promise<void> {
+  const db = getDb();
+  const pendingRows = await db.getAllAsync<{ id: number; notification_id: string | null }>(
+    `SELECT id, notification_id FROM doses
+     WHERE schedule_id = ? AND profile_id = ? AND status = 'pending' AND scheduled_time > ?`,
+    [scheduleId, profileId, toLocalISOString(after)]
+  );
+
+  for (const pending of pendingRows) {
+    if (pending.notification_id) {
+      // Cancel existing notification — imported lazily to avoid circular dep
+      const { cancelNotification } = await import('@/lib/notifications');
+      await cancelNotification(pending.notification_id).catch(() => {});
+    }
+    await db.runAsync('DELETE FROM doses WHERE id = ? AND profile_id = ?', [pending.id, profileId]);
+  }
+}
+
+/**
+ * Apaga as doses `pending` futuras de um schedule e as regenera com a
+ * configuração atual — usada depois de editar dosagem/frequência/horários
+ * de um schedule existente, para que só as doses ainda não resolvidas
+ * (pending) reflitam a nova config; doses já tomadas/puladas/adiadas são
+ * preservadas.
+ */
+export async function regenerateFutureDosesForSchedule(
+  schedule: Schedule,
+  daysAhead = 30
+): Promise<void> {
+  const profileId = requireActiveProfileId();
+  await deleteFuturePendingDoses(schedule.id, profileId, new Date());
+  await generateDosesForSchedule(schedule, daysAhead);
+}
+
+/**
  * When a dose is taken at a different time than scheduled on an interval_hours
  * schedule, realign future pending doses so they originate from the actual
  * taken time instead of the original anchor.
@@ -72,21 +116,7 @@ export async function realignIntervalSchedule(
   const intervalMs = frequencyConfig.intervalHours * 3_600_000;
   const now = new Date();
 
-  // Delete all future pending doses for this schedule
-  const pendingRows = await db.getAllAsync<{ id: number; notification_id: string | null }>(
-    `SELECT id, notification_id FROM doses
-     WHERE schedule_id = ? AND profile_id = ? AND status = 'pending' AND scheduled_time > ?`,
-    [scheduleId, profileId, toLocalISOString(now)]
-  );
-
-  for (const pending of pendingRows) {
-    if (pending.notification_id) {
-      // Cancel existing notification — imported lazily to avoid circular dep
-      const { cancelNotification } = await import('@/lib/notifications');
-      await cancelNotification(pending.notification_id).catch(() => {});
-    }
-    await db.runAsync('DELETE FROM doses WHERE id = ? AND profile_id = ?', [pending.id, profileId]);
-  }
+  await deleteFuturePendingDoses(scheduleId, profileId, now);
 
   // Regenerate doses starting from takenTime + 1 interval
   const genEnd = new Date(now.getTime() + daysAhead * 24 * 3_600_000);

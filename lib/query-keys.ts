@@ -14,6 +14,8 @@ export const queryKeys = {
   },
   schedules: {
     all: ['schedules'] as const,
+    detail: (id: number) => ['schedules', 'detail', id] as const,
+    byMedicine: (medicineId: number) => ['schedules', 'by-medicine', medicineId] as const,
   },
   stockProjections: ['stock-projections'] as const,
   adherence: {

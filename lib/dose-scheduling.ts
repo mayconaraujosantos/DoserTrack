@@ -1,6 +1,7 @@
 import {
   generateDosesForSchedule,
   getDosesForDateRange,
+  regenerateFutureDosesForSchedule,
   updateDoseNotificationId,
   updateDoseStatus,
 } from '@/lib/database';
@@ -43,6 +44,38 @@ export async function finalizeNewSchedule(schedule: Schedule, medicineName: stri
       await updateDoseStatus(dose.id, 'skipped');
       continue;
     }
+
+    const notificationId = await scheduleDoseNotification({
+      id: dose.id,
+      medicineName,
+      dosage: schedule.dosage,
+      scheduledTime: dose.scheduledTime,
+    });
+    if (notificationId) await updateDoseNotificationId(dose.id, notificationId);
+  }
+}
+
+/**
+ * Orquestra os passos após editar um Schedule existente: regenera só as
+ * doses futuras `pending` sob a nova configuração (preservando doses já
+ * tomadas/puladas/adiadas) e reagenda notificações locais para a janela
+ * dos próximos 7 dias.
+ */
+export async function finalizeScheduleUpdate(
+  schedule: Schedule,
+  medicineName: string
+): Promise<void> {
+  await regenerateFutureDosesForSchedule(schedule, DOSE_GENERATION_DAYS_AHEAD);
+
+  const today = todayStr();
+  const windowEnd = new Date();
+  windowEnd.setDate(windowEnd.getDate() + (NOTIFICATION_WINDOW_DAYS - 1));
+  const windowEndStr = windowEnd.toISOString().split('T')[0];
+
+  const doses = await getDosesForDateRange(today, windowEndStr);
+
+  for (const dose of doses) {
+    if (dose.scheduleId !== schedule.id || dose.status !== 'pending') continue;
 
     const notificationId = await scheduleDoseNotification({
       id: dose.id,

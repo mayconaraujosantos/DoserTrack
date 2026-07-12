@@ -44,6 +44,20 @@ export async function getSchedulesByMedicine(medicineId: number): Promise<Schedu
   return rows.map(rowToSchedule);
 }
 
+export async function getScheduleById(id: number): Promise<Schedule | null> {
+  const profileId = requireActiveProfileId();
+  const row = await getDb().getFirstAsync<Record<string, unknown>>(
+    `
+    SELECT s.*, m.name as medicine_name
+    FROM schedules s
+    JOIN medicines m ON s.medicine_id = m.id
+    WHERE s.id = ? AND s.profile_id = ?
+  `,
+    [id, profileId]
+  );
+  return row ? rowToSchedule(row) : null;
+}
+
 export async function createSchedule(
   data: Omit<Schedule, 'id' | 'createdAt' | 'medicineName' | 'profileId'>
 ): Promise<Schedule> {
@@ -65,6 +79,38 @@ export async function createSchedule(
   const row = await db.getFirstAsync<Record<string, unknown>>(
     'SELECT * FROM schedules WHERE id = ? AND profile_id = ?',
     [result.lastInsertRowId, profileId]
+  );
+  return rowToSchedule(row!);
+}
+
+export async function updateSchedule(
+  id: number,
+  data: Pick<Schedule, 'dosage' | 'doseQuantity' | 'frequencyConfig' | 'startDate' | 'endDate'>
+): Promise<Schedule> {
+  const profileId = requireActiveProfileId();
+  const db = getDb();
+  await db.runAsync(
+    `UPDATE schedules
+     SET dosage = ?, dose_quantity = ?, frequency_config = ?, start_date = ?, end_date = ?
+     WHERE id = ? AND profile_id = ?`,
+    [
+      data.dosage,
+      data.doseQuantity,
+      JSON.stringify(data.frequencyConfig),
+      data.startDate,
+      data.endDate ?? null,
+      id,
+      profileId,
+    ]
+  );
+  const row = await db.getFirstAsync<Record<string, unknown>>(
+    `
+    SELECT s.*, m.name as medicine_name
+    FROM schedules s
+    JOIN medicines m ON s.medicine_id = m.id
+    WHERE s.id = ? AND s.profile_id = ?
+  `,
+    [id, profileId]
   );
   return rowToSchedule(row!);
 }

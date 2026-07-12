@@ -2,8 +2,10 @@ import { Button } from '@/components/ui/button/Button';
 import { Input } from '@/components/ui/input/Input';
 import { Text } from '@/components/ui/text/Text';
 import { useMedicine } from '@/hooks/use-medicines';
+import { useSchedulesByMedicine } from '@/hooks/use-schedules';
 import { useTheme } from '@/hooks/use-theme';
 import { updateMedicine } from '@/lib/database';
+import { describeFrequency } from '@/lib/frequency-strategy';
 import { invalidateTrackingQueries } from '@/lib/query-keys';
 import type { MedicineType } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
@@ -56,6 +58,7 @@ export default function EditMedicineScreen() {
   const qc = useQueryClient();
 
   const { data: medicine, isLoading } = useMedicine(medicineId);
+  const { data: schedules = [] } = useSchedulesByMedicine(medicineId);
 
   useEffect(() => {
     if (!medicine) return;
@@ -232,6 +235,43 @@ export default function EditMedicineScreen() {
         style={styles.inputText}
       />
 
+      <Text variant="label" color={C.sub} style={styles.sectionLabel}>
+        Horários
+      </Text>
+      {schedules.length === 0 ? (
+        <Text variant="caption" color={C.sub}>
+          Nenhum horário cadastrado para este medicamento.
+        </Text>
+      ) : (
+        <View style={styles.scheduleList}>
+          {schedules.map(s => (
+            <TouchableOpacity
+              key={s.id}
+              style={[styles.scheduleRow, { backgroundColor: C.card, borderColor: C.border }]}
+              onPress={() => router.push(`/edit-schedule?id=${s.id}` as never)}
+              accessibilityLabel={`Editar horário de ${s.dosage}`}
+              accessibilityRole="button"
+            >
+              <View style={styles.flex}>
+                <Text variant="body">{s.dosage}</Text>
+                <Text variant="caption" color={C.sub}>
+                  {describeFrequency(s.frequencyConfig)}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={C.sub} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+      <Button
+        variant="secondary"
+        size="md"
+        onPress={() => router.push(`/add-schedule?medicineId=${medicineId}` as never)}
+        accessibilityLabel="Adicionar novo horário"
+      >
+        + Adicionar horário
+      </Button>
+
       <Button
         variant="primary"
         size="lg"
@@ -276,4 +316,14 @@ const styles = StyleSheet.create({
   unitBadge: { paddingHorizontal: 8 },
   inputText: { flex: 1 },
   submitBtn: { marginTop: 8 },
+  flex: { flex: 1 },
+  scheduleList: { gap: 8 },
+  scheduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
 });

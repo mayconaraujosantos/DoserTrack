@@ -94,3 +94,18 @@ const strategies: Record<FrequencyType, FrequencyStrategy> = {
 export function getFrequencyStrategy(type: FrequencyType): FrequencyStrategy {
   return strategies[type];
 }
+
+const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+/** Resumo legível de um FrequencyConfig, ex.: "Seg, Ter, Qua • 08:00, 20:00". */
+export function describeFrequency(config: FrequencyConfig): string {
+  let base: string;
+  if (config.type === 'interval_hours') {
+    base = `A cada ${config.intervalHours}h`;
+  } else if (config.type === 'specific_days') {
+    base = (config.specificDays ?? []).map(d => DAYS_PT[d]).join(', ');
+  } else {
+    base = `${config.daysOn} dias tomando / ${config.daysOff} de pausa`;
+  }
+  return `${base} • ${config.times.join(', ')}`;
+}

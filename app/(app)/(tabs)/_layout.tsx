@@ -19,6 +19,9 @@ function ScheduleIcon({ color, size }: IconProps) {
 function HistoryIcon({ color, size }: IconProps) {
   return <Feather name="bar-chart-2" size={size} color={color} />;
 }
+function SchedulesListIcon({ color, size }: IconProps) {
+  return <MaterialCommunityIcons name="alarm-multiple" size={size + 2} color={color} />;
+}
 
 function renderTabBar(props: BottomTabBarProps) {
   return <TabBarShell {...props} />;
@@ -47,6 +50,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="history"
         options={{ title: 'Histórico', tabBarIcon: HistoryIcon, href: null }}
+      />
+      <Tabs.Screen
+        name="schedules-list"
+        options={{ title: 'Agendamentos', tabBarIcon: SchedulesListIcon }}
       />
     </Tabs>
   );

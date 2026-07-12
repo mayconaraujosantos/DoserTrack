@@ -15,7 +15,14 @@ export {
   updateMedicine,
   updateMedicineStock,
 } from './medicines';
-export { createSchedule, deactivateSchedule, getSchedules, getSchedulesByMedicine } from './schedules';
+export {
+  createSchedule,
+  deactivateSchedule,
+  getScheduleById,
+  getSchedules,
+  getSchedulesByMedicine,
+  updateSchedule,
+} from './schedules';
 export {
   getAdherenceStreak,
   getDatesWithDosesInMonth,
@@ -30,5 +37,9 @@ export {
   updateDoseStatus,
 } from './doses';
 export type { DayAdherence } from './doses';
-export { generateDosesForSchedule, realignIntervalSchedule } from './dose-generation';
+export {
+  generateDosesForSchedule,
+  realignIntervalSchedule,
+  regenerateFutureDosesForSchedule,
+} from './dose-generation';
 export { getStockProjections } from './stock';

@@ -13,7 +13,10 @@ const ACTIVE_BG = '#E3E4E9';
 const INACTIVE_BG = '#29377D';
 const NAV_DARK = '#111e4f';
 
-type ActiveTab = 'home' | 'meds' | 'calendar' | 'scan';
+type ActiveTab = 'home' | 'meds' | 'calendar' | 'schedules' | 'scan';
+
+// Ordem em que os botões aparecem na cápsula da navbar.
+const VISIBLE_TAB_ROUTES = ['index', 'medicines', 'schedule', 'schedules-list'];
 
 type TabButtonProps = Readonly<{
   label: string;
@@ -39,6 +42,10 @@ function renderTabIcon(activeTab: ActiveTab, isFocused: boolean) {
 
   if (activeTab === 'calendar') {
     return <MaterialCommunityIcons name="calendar-month-outline" size={size + 2} color={color} />;
+  }
+
+  if (activeTab === 'schedules') {
+    return <MaterialCommunityIcons name="alarm-multiple" size={size + 2} color={color} />;
   }
 
   return <Feather name="maximize" size={size} color={color} />;
@@ -139,10 +146,12 @@ export function AnimatedTabBar(props: Readonly<AnimatedTabBarProps & AnimatedTab
   const routeToActiveTab = (routeName: string): Exclude<ActiveTab, 'scan'> => {
     if (routeName === 'medicines') return 'meds';
     if (routeName === 'schedule') return 'calendar';
+    if (routeName === 'schedules-list') return 'schedules';
     return 'home';
   };
 
-  const getTabProps = (index: number) => {
+  const getTabProps = (routeName: string) => {
+    const index = state.routes.findIndex(r => r.name === routeName);
     const route = state.routes[index];
     const options = descriptors[route.key].options;
     const label = (options.tabBarLabel as string | undefined) ?? options.title ?? route.name;
@@ -182,9 +191,9 @@ export function AnimatedTabBar(props: Readonly<AnimatedTabBarProps & AnimatedTab
     >
       <View style={styles.shadowContainer}>
         <View style={styles.container}>
-          <View style={styles.tripleCapsule}>
-            {[0, 1, 2].map(index => {
-              const tab = getTabProps(index);
+          <View style={styles.capsuleGroup}>
+            {VISIBLE_TAB_ROUTES.map(routeName => {
+              const tab = getTabProps(routeName);
               return (
                 <TabButton
                   key={tab.key}
@@ -231,7 +240,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     paddingVertical: 10,
   },
-  tripleCapsule: {
+  capsuleGroup: {
     flexDirection: 'row',
     backgroundColor: NAV_DARK,
     borderRadius: 50,
