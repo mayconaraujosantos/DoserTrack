@@ -1,18 +1,28 @@
 'use no memo';
 
-import { Feather, MaterialCommunityIcons, Octicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
 import React from 'react';
 import {
   Animated,
   Appearance,
+  Image,
   StyleSheet,
   TouchableOpacity,
   useWindowDimensions,
   View,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+
+// Icones extraidos de modelo_exemplo.png (traco branco com alpha), coloridos
+// via tintColor conforme o estado selecionado/nao selecionado do botao.
+const TAB_ICON_SOURCES = {
+  home: require('@/assets/images/tab-icons/home.png'),
+  meds: require('@/assets/images/tab-icons/medicines.png'),
+  calendar: require('@/assets/images/tab-icons/schedule.png'),
+  scan: require('@/assets/images/tab-icons/scan.png'),
+} as const;
 
 const BTN_D = 60;
 const CAPSULE_PAD = 10;
@@ -150,23 +160,21 @@ const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 function renderTabIcon(activeTab: ActiveTab, isFocused: boolean, size: number) {
   const color = isFocused ? '#000000' : '#FFFFFF';
 
-  if (activeTab === 'home') {
-    return <Octicons name="home" size={size} color={color} />;
-  }
-
-  if (activeTab === 'meds') {
-    return <MaterialCommunityIcons name="pill" size={size + 2} color={color} />;
-  }
-
-  if (activeTab === 'calendar') {
-    return <MaterialCommunityIcons name="calendar-month-outline" size={size + 2} color={color} />;
-  }
-
+  // "schedules" nao existe em modelo_exemplo.png (botao adicionado depois) --
+  // continua vetorial ate ter um icone no mesmo estilo dos demais.
   if (activeTab === 'schedules') {
     return <MaterialCommunityIcons name="alarm-multiple" size={size + 2} color={color} />;
   }
 
-  return <Feather name="maximize" size={size} color={color} />;
+  const source = TAB_ICON_SOURCES[activeTab];
+
+  return (
+    <Image
+      source={source}
+      style={{ width: size, height: size, tintColor: color }}
+      resizeMode="contain"
+    />
+  );
 }
 
 function TabButton({
@@ -251,7 +259,11 @@ function ActionButton({ onPress, btnSize, iconSize }: ActionButtonProps) {
       accessibilityRole="button"
       accessibilityLabel="Acoes rapidas"
     >
-      <Feather name="maximize" size={iconSize} color="#FFFFFF" />
+      <Image
+        source={TAB_ICON_SOURCES.scan}
+        style={{ width: iconSize, height: iconSize, tintColor: '#FFFFFF' }}
+        resizeMode="contain"
+      />
     </TouchableOpacity>
   );
 }
