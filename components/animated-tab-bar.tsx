@@ -4,11 +4,23 @@ import { Feather, MaterialCommunityIcons, Octicons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
 import React from 'react';
-import { Animated, Appearance, StyleSheet, TouchableOpacity, View } from 'react-native';
+import {
+  Animated,
+  Appearance,
+  StyleSheet,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 const BTN_D = 60;
 const CAPSULE_PAD = 10;
 const CAPSULE_GAP = 15;
+const WRAPPER_H_PADDING = 20;
+// bridgeWrap tem width 16 e marginHorizontal -3.5 de cada lado (16 - 7 = 9).
+const BRIDGE_NET_WIDTH = 9;
+// toque minimo acessivel (~44dp) abaixo do qual preferimos nao encolher mais.
+const MIN_BTN_D = 44;
 const ACTIVE_BG = '#E3E4E9';
 const INACTIVE_BG = '#29377D';
 const NAV_DARK = '#111e4f';
@@ -18,19 +30,38 @@ type ActiveTab = 'home' | 'meds' | 'calendar' | 'schedules' | 'scan';
 // Ordem em que os botões aparecem na cápsula da navbar.
 const VISIBLE_TAB_ROUTES = ['index', 'medicines', 'schedule', 'schedules-list'];
 
+/**
+ * Calcula o fator de escala pra cápsula (botões + gaps + padding) caber na
+ * largura da tela. Telas estreitas (ex.: Galaxy A03, ~384dp) nao comportam
+ * o tamanho padrao com 4 botoes visiveis + botao de acoes.
+ */
+function computeScale(windowWidth: number, buttonCount: number): number {
+  const capsuleGroupWidth = buttonCount * BTN_D + (buttonCount - 1) * CAPSULE_GAP + 2 * CAPSULE_PAD;
+  const singleCapsuleWidth = BTN_D + 2 * CAPSULE_PAD;
+  const fullContentWidth = capsuleGroupWidth + BRIDGE_NET_WIDTH + singleCapsuleWidth;
+  const availableWidth = windowWidth - 2 * WRAPPER_H_PADDING;
+
+  if (fullContentWidth <= availableWidth) return 1;
+
+  const scale = availableWidth / fullContentWidth;
+  const minScale = MIN_BTN_D / BTN_D;
+  return Math.max(scale, minScale);
+}
+
 type TabButtonProps = Readonly<{
   label: string;
   activeTab: Exclude<ActiveTab, 'scan'>;
   isFocused: boolean;
   onPress: () => void;
   onLongPress: () => void;
+  btnSize: number;
+  iconSize: number;
 }>;
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-function renderTabIcon(activeTab: ActiveTab, isFocused: boolean) {
+function renderTabIcon(activeTab: ActiveTab, isFocused: boolean, size: number) {
   const color = isFocused ? '#000000' : '#FFFFFF';
-  const size = 24;
 
   if (activeTab === 'home') {
     return <Octicons name="home" size={size} color={color} />;
@@ -51,7 +82,15 @@ function renderTabIcon(activeTab: ActiveTab, isFocused: boolean) {
   return <Feather name="maximize" size={size} color={color} />;
 }
 
-function TabButton({ label, activeTab, isFocused, onPress, onLongPress }: TabButtonProps) {
+function TabButton({
+  label,
+  activeTab,
+  isFocused,
+  onPress,
+  onLongPress,
+  btnSize,
+  iconSize,
+}: TabButtonProps) {
   const transition = React.useRef(new Animated.Value(isFocused ? 1 : 0)).current;
 
   React.useEffect(() => {
@@ -87,7 +126,11 @@ function TabButton({ label, activeTab, isFocused, onPress, onLongPress }: TabBut
 
   return (
     <AnimatedTouchable
-      style={[styles.button, animatedStyle]}
+      style={[
+        styles.button,
+        { width: btnSize, height: btnSize, borderRadius: btnSize / 2 },
+        animatedStyle,
+      ]}
       onPress={onPress}
       onLongPress={onLongPress}
       onPressIn={handlePressIn}
@@ -96,19 +139,21 @@ function TabButton({ label, activeTab, isFocused, onPress, onLongPress }: TabBut
       accessibilityState={{ selected: isFocused }}
       accessibilityLabel={label}
     >
-      {renderTabIcon(activeTab, isFocused)}
+      {renderTabIcon(activeTab, isFocused, iconSize)}
     </AnimatedTouchable>
   );
 }
 
 type ActionButtonProps = Readonly<{
   onPress: () => void;
+  btnSize: number;
+  iconSize: number;
 }>;
 
-function ActionButton({ onPress }: ActionButtonProps) {
+function ActionButton({ onPress, btnSize, iconSize }: ActionButtonProps) {
   return (
     <TouchableOpacity
-      style={styles.button}
+      style={[styles.button, { width: btnSize, height: btnSize, borderRadius: btnSize / 2 }]}
       onPress={onPress}
       onPressIn={() => {
         if (process.env.EXPO_OS === 'ios') {
@@ -119,15 +164,23 @@ function ActionButton({ onPress }: ActionButtonProps) {
       accessibilityRole="button"
       accessibilityLabel="Acoes rapidas"
     >
-      <Feather name="maximize" size={24} color="#FFFFFF" />
+      <Feather name="maximize" size={iconSize} color="#FFFFFF" />
     </TouchableOpacity>
   );
 }
 
-function BridgeConnector() {
+function BridgeConnector({ scale }: Readonly<{ scale: number }>) {
   return (
-    <View style={styles.bridgeWrap} pointerEvents="none">
-      <View style={styles.bridge} />
+    <View
+      style={[
+        styles.bridgeWrap,
+        { width: 16 * scale, height: 16 * scale, marginHorizontal: -3.5 * scale },
+      ]}
+      pointerEvents="none"
+    >
+      <View
+        style={[styles.bridge, { width: 18 * scale, height: 20 * scale, borderRadius: 7 * scale }]}
+      />
     </View>
   );
 }
@@ -142,6 +195,12 @@ export function AnimatedTabBar(props: Readonly<AnimatedTabBarProps & AnimatedTab
   const { state, descriptors, navigation, insets } = props;
   const scheme = Appearance.getColorScheme();
   const wrapperBg = scheme === 'dark' ? '#0b1024' : '#eef0f7';
+  const { width: windowWidth } = useWindowDimensions();
+  const scale = computeScale(windowWidth, VISIBLE_TAB_ROUTES.length);
+  const btnSize = BTN_D * scale;
+  const iconSize = 24 * scale;
+  const capsulePad = CAPSULE_PAD * scale;
+  const capsuleGap = CAPSULE_GAP * scale;
 
   const routeToActiveTab = (routeName: string): Exclude<ActiveTab, 'scan'> => {
     if (routeName === 'medicines') return 'meds';
@@ -191,7 +250,7 @@ export function AnimatedTabBar(props: Readonly<AnimatedTabBarProps & AnimatedTab
     >
       <View style={styles.shadowContainer}>
         <View style={styles.container}>
-          <View style={styles.capsuleGroup}>
+          <View style={[styles.capsuleGroup, { padding: capsulePad, gap: capsuleGap }]}>
             {VISIBLE_TAB_ROUTES.map(routeName => {
               const tab = getTabProps(routeName);
               return (
@@ -202,15 +261,17 @@ export function AnimatedTabBar(props: Readonly<AnimatedTabBarProps & AnimatedTab
                   isFocused={tab.isFocused}
                   onPress={tab.onPress}
                   onLongPress={tab.onLongPress}
+                  btnSize={btnSize}
+                  iconSize={iconSize}
                 />
               );
             })}
           </View>
 
-          <BridgeConnector />
+          <BridgeConnector scale={scale} />
 
-          <View style={styles.singleCapsule}>
-            <ActionButton onPress={props.onOpenActions} />
+          <View style={[styles.singleCapsule, { padding: capsulePad }]}>
+            <ActionButton onPress={props.onOpenActions} btnSize={btnSize} iconSize={iconSize} />
           </View>
         </View>
       </View>
@@ -244,32 +305,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: NAV_DARK,
     borderRadius: 50,
-    padding: CAPSULE_PAD,
-    gap: CAPSULE_GAP,
     overflow: 'hidden',
   },
   singleCapsule: {
     backgroundColor: NAV_DARK,
     borderRadius: 50,
-    padding: CAPSULE_PAD,
   },
   bridgeWrap: {
-    width: 16,
-    height: 16,
-    marginHorizontal: -3.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
   bridge: {
-    width: 18,
-    height: 20,
     backgroundColor: NAV_DARK,
-    borderRadius: 7,
   },
   button: {
-    width: BTN_D,
-    height: BTN_D,
-    borderRadius: BTN_D / 2,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: INACTIVE_BG,
