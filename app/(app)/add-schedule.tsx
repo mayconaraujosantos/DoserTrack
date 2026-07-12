@@ -298,7 +298,7 @@ export default function AddScheduleScreen() {
               onChangeText={setDoseQuantity}
               style={styles.shortInput}
             />
-            <Text variant="body" color={C.text}>
+            <Text variant="body" color={C.text} style={styles.inlineRowLabel}>
               {selectedMed?.stockUnit ?? 'unidade(s)'} do estoque por dose
             </Text>
           </View>
@@ -389,7 +389,7 @@ export default function AddScheduleScreen() {
                     onChangeText={setIntervalHours}
                     style={styles.shortInput}
                   />
-                  <Text variant="body" color={C.text}>
+                  <Text variant="body" color={C.text} style={styles.inlineRowLabel}>
                     horas
                   </Text>
                 </View>
@@ -405,7 +405,7 @@ export default function AddScheduleScreen() {
                       onChangeText={setDaysOn}
                       style={styles.shortInput}
                     />
-                    <Text variant="body" color={C.text}>
+                    <Text variant="body" color={C.text} style={styles.inlineRowLabel}>
                       dias tomando
                     </Text>
                   </View>
@@ -417,7 +417,7 @@ export default function AddScheduleScreen() {
                       onChangeText={setDaysOff}
                       style={styles.shortInput}
                     />
-                    <Text variant="body" color={C.text}>
+                    <Text variant="body" color={C.text} style={styles.inlineRowLabel}>
                       dias de pausa
                     </Text>
                   </View>
@@ -542,6 +542,7 @@ const styles = StyleSheet.create({
   dayText: { fontWeight: '700' },
   inlineRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
   shortInput: { width: 72 },
+  inlineRowLabel: { flexShrink: 1 },
   cycleWrap: { gap: 0 },
 
   // Times
