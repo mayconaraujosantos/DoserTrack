@@ -169,17 +169,50 @@ function ActionButton({ onPress, btnSize, iconSize }: ActionButtonProps) {
   );
 }
 
-function BridgeConnector({ scale }: Readonly<{ scale: number }>) {
+type BridgeConnectorProps = Readonly<{
+  scale: number;
+  height: number;
+  bgColor: string;
+}>;
+
+/**
+ * Ponte entre as duas cápsulas. Em vez de um retângulo com cantos convexos,
+ * "recorta" a borda de cima e de baixo com dois círculos na cor do fundo,
+ * criando uma curva côncava (U em cima, U de cabeça para baixo embaixo) que
+ * faz a ponte parecer soldada às cápsulas, tipo ampulheta.
+ */
+function BridgeConnector({ scale, height, bgColor }: BridgeConnectorProps) {
+  const width = 16 * scale;
+  const notchSize = width;
+
   return (
     <View
-      style={[
-        styles.bridgeWrap,
-        { width: 16 * scale, height: 16 * scale, marginHorizontal: -3.5 * scale },
-      ]}
+      style={[styles.bridgeWrap, { width, height, marginHorizontal: -3.5 * scale }]}
       pointerEvents="none"
     >
       <View
-        style={[styles.bridge, { width: 18 * scale, height: 20 * scale, borderRadius: 7 * scale }]}
+        style={[
+          styles.bridgeNotch,
+          {
+            top: -notchSize / 2,
+            width: notchSize,
+            height: notchSize,
+            borderRadius: notchSize / 2,
+            backgroundColor: bgColor,
+          },
+        ]}
+      />
+      <View
+        style={[
+          styles.bridgeNotch,
+          {
+            bottom: -notchSize / 2,
+            width: notchSize,
+            height: notchSize,
+            borderRadius: notchSize / 2,
+            backgroundColor: bgColor,
+          },
+        ]}
       />
     </View>
   );
@@ -268,7 +301,11 @@ export function AnimatedTabBar(props: Readonly<AnimatedTabBarProps & AnimatedTab
             })}
           </View>
 
-          <BridgeConnector scale={scale} />
+          <BridgeConnector
+            scale={scale}
+            height={btnSize + 2 * capsulePad}
+            bgColor={wrapperBg}
+          />
 
           <View style={[styles.singleCapsule, { padding: capsulePad }]}>
             <ActionButton onPress={props.onOpenActions} btnSize={btnSize} iconSize={iconSize} />
@@ -312,11 +349,12 @@ const styles = StyleSheet.create({
     borderRadius: 50,
   },
   bridgeWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bridge: {
     backgroundColor: NAV_DARK,
+    overflow: 'hidden',
+  },
+  bridgeNotch: {
+    position: 'absolute',
+    left: 0,
   },
   button: {
     justifyContent: 'center',
