@@ -12,18 +12,101 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
 const BTN_D = 60;
 const CAPSULE_PAD = 10;
 const CAPSULE_GAP = 15;
 const WRAPPER_H_PADDING = 20;
-// bridgeWrap tem width 16 e marginHorizontal -3.5 de cada lado (16 - 7 = 9).
-const BRIDGE_NET_WIDTH = 9;
 // toque minimo acessivel (~44dp) abaixo do qual preferimos nao encolher mais.
 const MIN_BTN_D = 44;
 const ACTIVE_BG = '#E3E4E9';
 const INACTIVE_BG = '#29377D';
 const NAV_DARK = '#111e4f';
+
+// Perfil (dx/R, meia-altura/R) medido pixel a pixel em modelo_exemplo.png,
+// do centro da cintura (dx=0) até o raio pleno da cápsula (dx≈1.159R). R é o
+// raio da ponta arredondada da cápsula (altura da cápsula / 2).
+const BRIDGE_PROFILE: readonly (readonly [number, number])[] = [
+  [0, 0.164],
+  [0.072, 0.176],
+  [0.145, 0.215],
+  [0.217, 0.304],
+  [0.29, 0.466],
+  [0.362, 0.587],
+  [0.435, 0.674],
+  [0.507, 0.747],
+  [0.58, 0.804],
+  [0.652, 0.855],
+  [0.725, 0.894],
+  [0.797, 0.928],
+  [0.87, 0.954],
+  [0.942, 0.973],
+  [1.014, 0.988],
+  [1.087, 0.995],
+  [1.159, 1.0],
+];
+const BRIDGE_HALF_SPAN_RATIO = BRIDGE_PROFILE.at(-1)![0];
+
+function catmullRomControlPoints(
+  p0: readonly [number, number],
+  p1: readonly [number, number],
+  p2: readonly [number, number],
+  p3: readonly [number, number]
+) {
+  return {
+    c1x: p1[0] + (p2[0] - p0[0]) / 6,
+    c1y: p1[1] + (p2[1] - p0[1]) / 6,
+    c2x: p2[0] - (p3[0] - p1[0]) / 6,
+    c2y: p2[1] - (p3[1] - p1[1]) / 6,
+  };
+}
+
+// toFixed evita notacao cientifica (ex.: "1e-15" de erro de ponto flutuante
+// perto de zero), que o parser nativo do svg (horcrux) nao entende.
+function fmt(n: number): string {
+  return n.toFixed(3);
+}
+
+function pathThroughPoints(points: (readonly [number, number])[]): string {
+  let d = `M ${fmt(points[0][0])} ${fmt(points[0][1])}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(i - 1, 0)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(i + 2, points.length - 1)];
+    const { c1x, c1y, c2x, c2y } = catmullRomControlPoints(p0, p1, p2, p3);
+    d += ` C ${fmt(c1x)} ${fmt(c1y)}, ${fmt(c2x)} ${fmt(c2y)}, ${fmt(p2[0])} ${fmt(p2[1])}`;
+  }
+  return d;
+}
+
+/** Path SVG fechado (topo + baixo espelhado) da ponte metaball, para uma cápsula de altura 2R. */
+function buildBridgePath(R: number): { d: string; width: number; height: number } {
+  const height = R * 2;
+  const halfSpan = BRIDGE_HALF_SPAN_RATIO * R;
+  const width = halfSpan * 2;
+
+  const left = [...BRIDGE_PROFILE]
+    .reverse()
+    .map(([dxN, hN]) => [halfSpan - dxN * R, R - hN * R] as const);
+  const right = BRIDGE_PROFILE.slice(1).map(
+    ([dxN, hN]) => [halfSpan + dxN * R, R - hN * R] as const
+  );
+  const top = [...left, ...right];
+  const bottom = [...top].reverse().map(([x, y]) => [x, height - y] as const);
+
+  const topD = pathThroughPoints(top);
+  // Remove o "M x y" inicial do path de baixo -- a reta vertical explícita
+  // abaixo já leva a caneta até esse mesmo ponto (borda direita, plena altura).
+  const bottomD = pathThroughPoints(bottom).replace(/^M [\d.-]+ [\d.-]+ /, '');
+
+  return {
+    d: `${topD} L ${fmt(bottom[0][0])} ${fmt(bottom[0][1])} ${bottomD} Z`,
+    width,
+    height,
+  };
+}
 
 type ActiveTab = 'home' | 'meds' | 'calendar' | 'schedules' | 'scan';
 
@@ -36,9 +119,13 @@ const VISIBLE_TAB_ROUTES = ['index', 'medicines', 'schedule', 'schedules-list'];
  * o tamanho padrao com 4 botoes visiveis + botao de acoes.
  */
 function computeScale(windowWidth: number, buttonCount: number): number {
+  const capsuleHeight = BTN_D + 2 * CAPSULE_PAD;
+  // A ponte se sobrepõe a metade (R) de cada cápsula vizinha (escondida atrás
+  // delas); só a parte além disso conta pra largura da linha.
+  const bridgeNetWidth = capsuleHeight * (BRIDGE_HALF_SPAN_RATIO - 1);
   const capsuleGroupWidth = buttonCount * BTN_D + (buttonCount - 1) * CAPSULE_GAP + 2 * CAPSULE_PAD;
   const singleCapsuleWidth = BTN_D + 2 * CAPSULE_PAD;
-  const fullContentWidth = capsuleGroupWidth + BRIDGE_NET_WIDTH + singleCapsuleWidth;
+  const fullContentWidth = capsuleGroupWidth + bridgeNetWidth + singleCapsuleWidth;
   const availableWidth = windowWidth - 2 * WRAPPER_H_PADDING;
 
   if (fullContentWidth <= availableWidth) return 1;
@@ -170,51 +257,24 @@ function ActionButton({ onPress, btnSize, iconSize }: ActionButtonProps) {
 }
 
 type BridgeConnectorProps = Readonly<{
-  scale: number;
   height: number;
-  bgColor: string;
 }>;
 
 /**
- * Ponte entre as duas cápsulas. Em vez de um retângulo com cantos convexos,
- * "recorta" a borda de cima e de baixo com dois círculos na cor do fundo,
- * criando uma curva côncava (U em cima, U de cabeça para baixo embaixo) que
- * faz a ponte parecer soldada às cápsulas, tipo ampulheta.
+ * Ponte entre as duas cápsulas, com a curva metaball medida pixel a pixel em
+ * modelo_exemplo.png (BRIDGE_PROFILE). Se sobrepõe a metade de cada cápsula
+ * vizinha (a parte do path com altura cheia) -- por isso capsuleGroup e
+ * singleCapsule precisam de zIndex maior, pra pintar por cima e esconder a
+ * sobreposição, deixando visível só a cintura fina entre elas.
  */
-function BridgeConnector({ scale, height, bgColor }: BridgeConnectorProps) {
-  const width = 16 * scale;
-  const notchSize = width;
+function BridgeConnector({ height }: BridgeConnectorProps) {
+  const R = height / 2;
+  const { d, width } = buildBridgePath(R);
 
   return (
-    <View
-      style={[styles.bridgeWrap, { width, height, marginHorizontal: -3.5 * scale }]}
-      pointerEvents="none"
-    >
-      <View
-        style={[
-          styles.bridgeNotch,
-          {
-            top: -notchSize / 2,
-            width: notchSize,
-            height: notchSize,
-            borderRadius: notchSize / 2,
-            backgroundColor: bgColor,
-          },
-        ]}
-      />
-      <View
-        style={[
-          styles.bridgeNotch,
-          {
-            bottom: -notchSize / 2,
-            width: notchSize,
-            height: notchSize,
-            borderRadius: notchSize / 2,
-            backgroundColor: bgColor,
-          },
-        ]}
-      />
-    </View>
+    <Svg width={width} height={height} style={{ marginHorizontal: -R }} pointerEvents="none">
+      <Path d={d} fill={NAV_DARK} />
+    </Svg>
   );
 }
 
@@ -301,11 +361,7 @@ export function AnimatedTabBar(props: Readonly<AnimatedTabBarProps & AnimatedTab
             })}
           </View>
 
-          <BridgeConnector
-            scale={scale}
-            height={btnSize + 2 * capsulePad}
-            bgColor={wrapperBg}
-          />
+          <BridgeConnector height={btnSize + 2 * capsulePad} />
 
           <View style={[styles.singleCapsule, { padding: capsulePad }]}>
             <ActionButton onPress={props.onOpenActions} btnSize={btnSize} iconSize={iconSize} />
@@ -343,18 +399,12 @@ const styles = StyleSheet.create({
     backgroundColor: NAV_DARK,
     borderRadius: 50,
     overflow: 'hidden',
+    zIndex: 1,
   },
   singleCapsule: {
     backgroundColor: NAV_DARK,
     borderRadius: 50,
-  },
-  bridgeWrap: {
-    backgroundColor: NAV_DARK,
-    overflow: 'hidden',
-  },
-  bridgeNotch: {
-    position: 'absolute',
-    left: 0,
+    zIndex: 1,
   },
   button: {
     justifyContent: 'center',
