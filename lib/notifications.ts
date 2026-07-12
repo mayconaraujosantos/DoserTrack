@@ -12,6 +12,32 @@ function getNotifications() {
   return require('expo-notifications') as typeof import('expo-notifications');
 }
 
+export const DOSE_NOTIFICATION_CATEGORY = 'dose-reminder';
+export const DOSE_ACTION_TAKE = 'take';
+export const DOSE_ACTION_SNOOZE = 'snooze';
+export const DOSE_ACTION_SKIP = 'skip';
+
+async function setupDoseNotificationCategory() {
+  const N = getNotifications();
+  await N.setNotificationCategoryAsync(DOSE_NOTIFICATION_CATEGORY, [
+    {
+      identifier: DOSE_ACTION_TAKE,
+      buttonTitle: 'Tomar',
+      options: { opensAppToForeground: false },
+    },
+    {
+      identifier: DOSE_ACTION_SNOOZE,
+      buttonTitle: 'Adiar 10 min',
+      options: { opensAppToForeground: false },
+    },
+    {
+      identifier: DOSE_ACTION_SKIP,
+      buttonTitle: 'Pular',
+      options: { opensAppToForeground: false, isDestructive: true },
+    },
+  ]);
+}
+
 export async function requestNotificationPermissions(): Promise<boolean> {
   if (IS_EXPO_GO) return false;
   const N = getNotifications();
@@ -23,6 +49,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
       lightColor: '#4A90D9',
     });
   }
+  await setupDoseNotificationCategory();
   const { status } = await N.requestPermissionsAsync();
   return status === 'granted';
 }
@@ -56,6 +83,7 @@ export async function scheduleDoseNotification(dose: {
         title: 'Hora do remédio!',
         body: `${dose.medicineName} — ${dose.dosage}`,
         data: { doseId: dose.id },
+        categoryIdentifier: DOSE_NOTIFICATION_CATEGORY,
         sound: true,
       },
       trigger: { type: N.SchedulableTriggerInputTypes.DATE, date: trigger },
@@ -83,6 +111,7 @@ export async function scheduleSnoozeNotification(
         title: 'Lembrete adiado',
         body: `${dose.medicineName} — ${dose.dosage}`,
         data: { doseId: dose.id },
+        categoryIdentifier: DOSE_NOTIFICATION_CATEGORY,
         sound: true,
       },
       trigger: { type: N.SchedulableTriggerInputTypes.DATE, date: trigger },
@@ -158,6 +187,44 @@ export function addNotificationResponseListener(
   if (IS_EXPO_GO) return { remove: () => undefined };
   const N = getNotifications();
   return N.addNotificationResponseReceivedListener(callback);
+}
+
+/**
+ * Processa o toque num botão de ação da notificação de dose (tomar/adiar/pular).
+ * Retorna 'navigate' quando o usuário tocou no corpo da notificação (não num
+ * botão) — nesse caso o chamador deve abrir a tela `reminder-alert`.
+ */
+export async function handleDoseNotificationAction(
+  response: import('expo-notifications').NotificationResponse
+): Promise<'navigate' | 'handled'> {
+  const N = getNotifications();
+  const doseId = response.notification.request.content.data?.doseId as number | undefined;
+  if (!doseId || response.actionIdentifier === N.DEFAULT_ACTION_IDENTIFIER) {
+    return 'navigate';
+  }
+
+  const { getDoseById, updateDoseStatus, updateDoseNotificationId } =
+    await import('@/lib/database');
+  const dose = await getDoseById(doseId);
+  if (!dose) return 'handled';
+
+  if (dose.notificationId) await cancelNotification(dose.notificationId);
+
+  if (response.actionIdentifier === DOSE_ACTION_TAKE) {
+    await updateDoseStatus(doseId, 'taken', new Date().toISOString());
+  } else if (response.actionIdentifier === DOSE_ACTION_SKIP) {
+    await updateDoseStatus(doseId, 'skipped');
+  } else if (response.actionIdentifier === DOSE_ACTION_SNOOZE) {
+    await updateDoseStatus(doseId, 'snoozed');
+    const notifId = await scheduleSnoozeNotification({
+      id: dose.id,
+      medicineName: dose.medicineName ?? '',
+      dosage: dose.dosage ?? '',
+    });
+    if (notifId) await updateDoseNotificationId(dose.id, notifId);
+  }
+
+  return 'handled';
 }
 
 export async function checkOverdueDoses(): Promise<{ count: number; doses: Dose[] }> {

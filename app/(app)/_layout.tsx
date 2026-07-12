@@ -6,14 +6,17 @@ import { logger } from '@/lib/logger';
 import {
   addNotificationResponseListener,
   checkOverdueDoses,
+  handleDoseNotificationAction,
   requestNotificationPermissions,
   rescheduleAllPendingDoses,
   schedulePeriodicOverdueNotification,
   setupNotificationHandler,
 } from '@/lib/notifications';
+import { invalidateTrackingQueries } from '@/lib/query-keys';
 import { getStoredActiveProfileId, setStoredActiveProfileId } from '@/lib/storage';
 import { useAppStore } from '@/lib/store';
 import { pullFromCloud, syncToCloud } from '@/lib/sync';
+import { useQueryClient } from '@tanstack/react-query';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -37,6 +40,7 @@ export default function AppLayout() {
   const setDbReady = useAppStore(s => s.setDbReady);
   const setActiveProfile = useAppStore(s => s.setActiveProfile);
   const router = useRouter();
+  const qc = useQueryClient();
   const [initializing, setInitializing] = useState(true);
   const [locked, setLocked] = useState(false);
   const [dbError, setDbError] = useState(false);
@@ -117,10 +121,18 @@ export default function AppLayout() {
     });
 
     const notifSub = addNotificationResponseListener(response => {
-      const doseId = response.notification.request.content.data?.doseId as number | undefined;
-      if (doseId) {
-        router.push({ pathname: '/reminder-alert' as any, params: { doseId } });
-      }
+      handleDoseNotificationAction(response)
+        .then(result => {
+          if (result === 'navigate') {
+            const doseId = response.notification.request.content.data?.doseId as number | undefined;
+            if (doseId) {
+              router.push({ pathname: '/reminder-alert' as any, params: { doseId } });
+            }
+          } else {
+            invalidateTrackingQueries(qc);
+          }
+        })
+        .catch(e => log.error('Erro ao processar ação da notificação:', e));
     });
 
     setInitializing(false);
@@ -130,7 +142,7 @@ export default function AppLayout() {
       authSub.data.subscription.unsubscribe();
       notifSub.remove();
     };
-  }, [router, setActiveProfile, setDbReady]);
+  }, [router, setActiveProfile, setDbReady, qc]);
 
   if (dbError) {
     return (
@@ -198,6 +210,10 @@ export default function AppLayout() {
       <Stack.Screen
         name="add-schedule"
         options={{ presentation: 'modal', title: 'Novo Horário' }}
+      />
+      <Stack.Screen
+        name="edit-schedule"
+        options={{ presentation: 'modal', title: 'Editar Horário' }}
       />
       <Stack.Screen name="edit-dose" options={{ presentation: 'modal', title: 'Editar Dose' }} />
       <Stack.Screen name="profiles" options={{ presentation: 'modal', title: 'Perfis' }} />
