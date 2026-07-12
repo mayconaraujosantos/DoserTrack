@@ -78,11 +78,10 @@ export async function updateMedicine(
 
 export async function updateMedicineStock(id: number, newQuantity: number) {
   const profileId = requireActiveProfileId();
-  await getDb().runAsync('UPDATE medicines SET stock_quantity = ? WHERE id = ? AND profile_id = ?', [
-    newQuantity,
-    id,
-    profileId,
-  ]);
+  await getDb().runAsync(
+    'UPDATE medicines SET stock_quantity = ? WHERE id = ? AND profile_id = ?',
+    [newQuantity, id, profileId]
+  );
 }
 
 export async function deleteMedicine(id: number) {

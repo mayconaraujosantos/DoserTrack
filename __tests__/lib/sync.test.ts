@@ -135,10 +135,18 @@ describe('pullFromCloud', () => {
 
     await pullFromCloud();
 
-    expect(mockRunQuery).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO medicines'),
-      [1, 1, 'Dipirona', 'tablet', 10, 'comprimidos', null, 5, '2026-07-01T00:00:00', '2026-07-02T00:00:00']
-    );
+    expect(mockRunQuery).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO medicines'), [
+      1,
+      1,
+      'Dipirona',
+      'tablet',
+      10,
+      'comprimidos',
+      null,
+      5,
+      '2026-07-01T00:00:00',
+      '2026-07-02T00:00:00',
+    ]);
   });
 
   it('se medicines falhar, schedules e doses ainda são tentados', async () => {

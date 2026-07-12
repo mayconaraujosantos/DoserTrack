@@ -44,24 +44,24 @@ describe('getDisplayStatus', () => {
 
 describe('isOverdue', () => {
   it('é true apenas quando o display status é "late"', () => {
-    expect(isOverdue(makeDose({ status: 'pending', scheduledTime: '2026-07-07T08:00:00' }), now)).toBe(
-      true
-    );
+    expect(
+      isOverdue(makeDose({ status: 'pending', scheduledTime: '2026-07-07T08:00:00' }), now)
+    ).toBe(true);
   });
 
   it('é false para dose adiada com horário já passado', () => {
-    expect(isOverdue(makeDose({ status: 'snoozed', scheduledTime: '2026-07-07T08:00:00' }), now)).toBe(
-      false
-    );
+    expect(
+      isOverdue(makeDose({ status: 'snoozed', scheduledTime: '2026-07-07T08:00:00' }), now)
+    ).toBe(false);
   });
 
   it('é false para dose tomada ou pulada', () => {
-    expect(isOverdue(makeDose({ status: 'taken', scheduledTime: '2026-07-07T08:00:00' }), now)).toBe(
-      false
-    );
-    expect(isOverdue(makeDose({ status: 'skipped', scheduledTime: '2026-07-07T08:00:00' }), now)).toBe(
-      false
-    );
+    expect(
+      isOverdue(makeDose({ status: 'taken', scheduledTime: '2026-07-07T08:00:00' }), now)
+    ).toBe(false);
+    expect(
+      isOverdue(makeDose({ status: 'skipped', scheduledTime: '2026-07-07T08:00:00' }), now)
+    ).toBe(false);
   });
 
   it('é false para dose pendente com horário futuro', () => {

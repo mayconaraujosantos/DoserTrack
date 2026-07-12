@@ -1,6 +1,10 @@
 import type { FrequencyConfig } from '@/types';
 
-export function buildIntervalDates(config: FrequencyConfig, genStart: Date, finalEnd: Date): Date[] {
+export function buildIntervalDates(
+  config: FrequencyConfig,
+  genStart: Date,
+  finalEnd: Date
+): Date[] {
   if (!config.intervalHours) return [];
   const intervalMs = config.intervalHours * 3_600_000;
   const [h, m] = config.times[0].split(':').map(Number);

@@ -79,8 +79,8 @@ describe('buildFixedCycleDates', () => {
     const dates = buildFixedCycleDates(config, genStart, finalEnd, startDate);
 
     expect(iso(dates)).toEqual(
-      ['2026-07-06', '2026-07-07', '2026-07-09', '2026-07-10'].map(
-        d => new Date(`${d}T08:00:00`).toISOString()
+      ['2026-07-06', '2026-07-07', '2026-07-09', '2026-07-10'].map(d =>
+        new Date(`${d}T08:00:00`).toISOString()
       )
     );
   });

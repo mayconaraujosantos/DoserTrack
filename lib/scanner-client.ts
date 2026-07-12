@@ -15,7 +15,8 @@ async function parseInvokeError(
   logTag: string
 ): Promise<{ message: string; retryable: boolean }> {
   let message =
-    (error as { message?: string })?.message ?? 'Não foi possível processar a imagem. Tente novamente.';
+    (error as { message?: string })?.message ??
+    'Não foi possível processar a imagem. Tente novamente.';
   let retryable = false;
 
   const context = (error as { context?: unknown })?.context;
@@ -31,7 +32,11 @@ async function parseInvokeError(
   return { message, retryable };
 }
 
-async function waitBeforeRetry(attempt: number, retryDelaysMs: number[], logTag: string): Promise<void> {
+async function waitBeforeRetry(
+  attempt: number,
+  retryDelaysMs: number[],
+  logTag: string
+): Promise<void> {
   if (attempt > 0) {
     console.log(`${logTag} Tentativa ${attempt + 1} após ${retryDelaysMs[attempt - 1]}ms...`);
     await new Promise(resolve => setTimeout(resolve, retryDelaysMs[attempt - 1]));
