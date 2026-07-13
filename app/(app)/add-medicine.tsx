@@ -573,9 +573,9 @@ const s3 = StyleSheet.create({
   checkmark: { marginLeft: 'auto' },
   daysRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   dayBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
