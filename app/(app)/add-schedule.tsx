@@ -9,6 +9,7 @@ import { useMedicines } from '@/hooks/use-medicines';
 import { useTheme } from '@/hooks/use-theme';
 import { createSchedule } from '@/lib/database';
 import { finalizeNewSchedule } from '@/lib/dose-scheduling';
+import { localDateStr } from '@/lib/date';
 import { invalidateTrackingQueries } from '@/lib/query-keys';
 import type { FrequencyType } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,10 +20,6 @@ import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-nat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-
-function todayStr() {
-  return new Date().toISOString().split('T')[0];
-}
 
 function dosagePlaceholder(type: string | undefined): string {
   if (type === 'ml') return 'Ex: 10mL';
@@ -110,7 +107,7 @@ export default function AddScheduleScreen() {
   const [daysOff, setDaysOff] = useState('7');
   const [times, setTimes] = useState<string[]>(['08:00']);
   const [timeInput, setTimeInput] = useState('');
-  const [startDate, setStartDate] = useState(todayStr());
+  const [startDate, setStartDate] = useState(localDateStr());
   const [endDate, setEndDate] = useState('');
 
   const C = useTheme();

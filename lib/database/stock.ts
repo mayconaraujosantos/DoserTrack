@@ -1,3 +1,4 @@
+import { localDateStr } from '@/lib/date';
 import type { FrequencyConfig, StockProjection } from '@/types';
 import { getDb, requireActiveProfileId } from './connection';
 
@@ -55,7 +56,7 @@ export async function getStockProjections(): Promise<Record<number, StockProject
       result[id] = {
         dailyConsumption: data.dailyConsumption,
         daysRemaining,
-        estimatedEndDate: end.toISOString().slice(0, 10),
+        estimatedEndDate: localDateStr(end),
       };
     }
   }

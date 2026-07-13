@@ -1,3 +1,4 @@
+import { localDateStr } from '@/lib/date';
 import type { Dose, DoseStatus, MedicineType } from '@/types';
 import { getDb, requireActiveProfileId } from './connection';
 
@@ -186,6 +187,15 @@ export async function getDosesForDateRange(startDate: string, endDate: string): 
 
 export async function getPendingDosesWithoutNotification(): Promise<Dose[]> {
   const profileId = requireActiveProfileId();
+  // scheduled_time e gravado em horario local sem separador "T" trocado por
+  // espaco (formato toLocalISOString). datetime('now') do SQLite e UTC e usa
+  // espaco como separador -- comparar os dois direto e incorreto tanto pelo
+  // fuso quanto pelo "T" (ASCII maior que espaco) sempre vencer na comparacao
+  // de string. Passamos o "agora" local no mesmo formato para comparar como
+  // igual.
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const nowLocal = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
   const rows = await getDb().getAllAsync<Record<string, unknown>>(
     `
     SELECT d.*, m.name as medicine_name, m.type as medicine_type, m.photo_uri as medicine_photo_uri, s.dosage
@@ -194,11 +204,11 @@ export async function getPendingDosesWithoutNotification(): Promise<Dose[]> {
     JOIN schedules s ON d.schedule_id = s.id
     WHERE d.profile_id = ?
       AND d.status = 'pending'
-      AND d.scheduled_time > datetime('now')
+      AND d.scheduled_time > ?
       AND (d.notification_id IS NULL OR d.notification_id = '')
     ORDER BY d.scheduled_time ASC
   `,
-    [profileId]
+    [profileId, nowLocal]
   );
   return rows.map(rowToDose);
 }
@@ -212,6 +222,9 @@ export interface DayAdherence {
 
 export async function getWeekAdherence(): Promise<DayAdherence[]> {
   const profileId = requireActiveProfileId();
+  const today = new Date();
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 6);
   const rows = await getDb().getAllAsync<{ date: string; total: number; taken: number }>(
     `
     SELECT
@@ -220,18 +233,19 @@ export async function getWeekAdherence(): Promise<DayAdherence[]> {
       SUM(CASE WHEN status = 'taken' THEN 1 ELSE 0 END) as taken
     FROM doses
     WHERE profile_id = ?
-      AND date(scheduled_time) >= date('now', '-6 days')
-      AND date(scheduled_time) <= date('now')
+      AND date(scheduled_time) >= ?
+      AND date(scheduled_time) <= ?
     GROUP BY date(scheduled_time)
     ORDER BY date ASC
   `,
-    [profileId]
+    [profileId, localDateStr(weekAgo), localDateStr(today)]
   );
   return rows.map(r => ({ ...r, rate: r.total > 0 ? r.taken / r.total : 0 }));
 }
 
 export async function getAdherenceStreak(): Promise<number> {
   const profileId = requireActiveProfileId();
+  const today = new Date();
   const rows = await getDb().getAllAsync<{ date: string; total: number; taken: number }>(
     `
     SELECT
@@ -240,21 +254,20 @@ export async function getAdherenceStreak(): Promise<number> {
       SUM(CASE WHEN status = 'taken' THEN 1 ELSE 0 END) as taken
     FROM doses
     WHERE profile_id = ?
-      AND date(scheduled_time) < date('now')
+      AND date(scheduled_time) < ?
       AND status != 'pending'
     GROUP BY date(scheduled_time)
     ORDER BY date DESC
     LIMIT 90
   `,
-    [profileId]
+    [profileId, localDateStr(today)]
   );
 
   let streak = 0;
-  const today = new Date();
   for (let i = 0; i < rows.length; i++) {
     const expected = new Date(today);
     expected.setDate(today.getDate() - (i + 1));
-    const expectedStr = expected.toISOString().slice(0, 10);
+    const expectedStr = localDateStr(expected);
     const row = rows[i];
     if (row.date !== expectedStr) break;
     if (row.total > 0 && row.taken / row.total >= 0.8) streak++;
@@ -273,11 +286,11 @@ export async function getRecentHistory(limit = 50): Promise<Dose[]> {
     JOIN schedules s ON d.schedule_id = s.id
     WHERE d.profile_id = ?
       AND d.status != 'pending'
-      AND date(d.scheduled_time) <= date('now')
+      AND date(d.scheduled_time) <= ?
     ORDER BY d.scheduled_time DESC
     LIMIT ?
   `,
-    [profileId, limit]
+    [profileId, localDateStr(new Date()), limit]
   );
   return rows.map(rowToDose);
 }

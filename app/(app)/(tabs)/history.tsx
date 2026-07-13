@@ -12,6 +12,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
 import { useWeekAdherence } from '@/hooks/use-adherence';
+import { localDateStr } from '@/lib/date';
 import { getRecentHistory } from '@/lib/database';
 import { DOSE_STATUS_LABEL } from '@/lib/dose-status';
 import { queryKeys } from '@/lib/query-keys';
@@ -31,7 +32,7 @@ function getLast7Days(): string[] {
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
-    return d.toISOString().split('T')[0];
+    return localDateStr(d);
   });
 }
 
@@ -60,8 +61,8 @@ function doseStatusBadgeVariant(status: Dose['status']): BadgeVariant {
 }
 
 function sectionDateLabel(dateStr: string): string {
-  const todayKey = new Date().toISOString().split('T')[0];
-  const yesterdayKey = new Date(Date.now() - 86_400_000).toISOString().split('T')[0];
+  const todayKey = localDateStr();
+  const yesterdayKey = localDateStr(new Date(Date.now() - 86_400_000));
   if (dateStr === todayKey) return 'Hoje';
   if (dateStr === yesterdayKey) return 'Ontem';
   return new Date(`${dateStr}T12:00:00`).toLocaleDateString('pt-BR', {
@@ -163,7 +164,7 @@ export default function HistoryScreen() {
   const totalTaken = adherence.reduce((s, a) => s + a.taken, 0);
   const totalDoses = adherence.reduce((s, a) => s + a.total, 0);
   const overallPct = totalDoses > 0 ? Math.round((totalTaken / totalDoses) * 100) : 0;
-  const todayKey = new Date().toISOString().split('T')[0];
+  const todayKey = localDateStr();
 
   // Group history by date (descending)
   const sections = useMemo(() => {
@@ -205,8 +206,8 @@ export default function HistoryScreen() {
       startDate.setDate(endDate.getDate() - 29);
       const html = await generateAdherenceReport({
         profileName: 'Perfil padrão',
-        startDate: startDate.toISOString().split('T')[0],
-        endDate: endDate.toISOString().split('T')[0],
+        startDate: localDateStr(startDate),
+        endDate: localDateStr(endDate),
       });
       const { uri } = await Print.printToFileAsync({ html });
       const canShare = await Sharing.isAvailableAsync();

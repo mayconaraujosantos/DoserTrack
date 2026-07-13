@@ -1,3 +1,4 @@
+import { localDateStr } from '@/lib/date';
 import { isOverdue } from '@/lib/dose-status';
 import type { Dose } from '@/types';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
@@ -231,8 +232,7 @@ export async function checkOverdueDoses(): Promise<{ count: number; doses: Dose[
   try {
     const { getDosesForDate } = await import('@/lib/database');
 
-    const today = new Date().toISOString().split('T')[0];
-    const doses = await getDosesForDate(today);
+    const doses = await getDosesForDate(localDateStr());
     const overdue = doses.filter(d => isOverdue(d));
 
     return { count: overdue.length, doses: overdue };

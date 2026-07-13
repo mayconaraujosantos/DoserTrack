@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card/Card';
 import { Text } from '@/components/ui/text/Text';
 import { useDosesForDate } from '@/hooks/use-doses';
 import { useTheme } from '@/hooks/use-theme';
+import { localDateStr } from '@/lib/date';
 import { isOverdue } from '@/lib/dose-status';
 import { invalidateTrackingQueries } from '@/lib/query-keys';
 import type { Dose } from '@/types';
@@ -22,10 +23,6 @@ function formatDateTime(iso: string) {
   });
 }
 
-function toLocalDateStr(date: Date): string {
-  return date.toISOString().split('T')[0];
-}
-
 export default function OverdueScreen() {
   const C = useTheme();
   const insets = useSafeAreaInsets();
@@ -34,7 +31,7 @@ export default function OverdueScreen() {
 
   const [overdueDoses, setOverdueDoses] = useState<Dose[]>([]);
 
-  const { data: todayDoses, isLoading } = useDosesForDate(toLocalDateStr(new Date()));
+  const { data: todayDoses, isLoading } = useDosesForDate(localDateStr());
 
   useEffect(() => {
     if (!todayDoses) return;

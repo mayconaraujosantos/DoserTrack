@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input/Input';
 import { SuccessToast } from '@/components/ui/toast/SuccessToast';
 import { Text } from '@/components/ui/text/Text';
 import { useTheme } from '@/hooks/use-theme';
+import { localDateStr } from '@/lib/date';
 import { createMedicine, createSchedule } from '@/lib/database';
 import { finalizeNewSchedule } from '@/lib/dose-scheduling';
 import { invalidateTrackingQueries } from '@/lib/query-keys';
@@ -48,14 +49,10 @@ const TYPE_LABELS: Record<string, string> = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function todayStr() {
-  return new Date().toISOString().split('T')[0];
-}
-
 function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return localDateStr(d);
 }
 
 /**
@@ -71,7 +68,7 @@ function anchorForInterval(frequencyHours: number): string {
 }
 
 function smartStartDate(times: string[]): string {
-  const today = todayStr();
+  const today = localDateStr();
   const now = new Date();
   const allPassed = times.every(t => {
     const [h, m] = t.split(':').map(Number);
@@ -356,7 +353,7 @@ function ConfirmInlineEditor({
           >
             <Ionicons name="calendar-outline" size={16} color={C.primary} />
             <Text variant="caption" color={C.primary}>
-              {state.startDate === todayStr()
+              {state.startDate === localDateStr()
                 ? `Primeira dose hoje às ${times[0]}`
                 : `Primeira dose amanhã às ${times[0]} — horários de hoje já passaram`}
             </Text>

@@ -3,6 +3,7 @@ import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAdherenceStreak, useWeekAdherence } from '@/hooks/use-adherence';
 import { useTheme } from '@/hooks/use-theme';
+import { localDateStr } from '@/lib/date';
 import { Text } from '@/components/ui/text/Text';
 
 const DAY_LABELS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
@@ -31,7 +32,7 @@ export function AdherenceWidget() {
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      const key = d.toISOString().slice(0, 10);
+      const key = localDateStr(d);
       const dow = d.getDay();
       return { key, label: DAY_LABELS[dow], data: map.get(key) };
     });

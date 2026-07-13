@@ -4,6 +4,7 @@ import { DatePickerInput } from '@/components/ui/input/date-picker-input';
 import { TimePickerInput } from '@/components/ui/input/time-picker-input';
 import type { ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { localDateStr } from '@/lib/date';
 import { createMedicine, createSchedule } from '@/lib/database';
 import { finalizeNewSchedule } from '@/lib/dose-scheduling';
 import { haptic } from '@/lib/haptics';
@@ -58,10 +59,6 @@ const UNITS: Record<MedicineType, string> = {
 const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 const EASING = Easing.out(Easing.cubic);
-
-function todayStr() {
-  return new Date().toISOString().split('T')[0];
-}
 
 // ─── Step Dots ────────────────────────────────────────────────────────────────
 
@@ -647,7 +644,7 @@ export default function AddMedicineScreen() {
   const [daysOn, setDaysOn] = useState('21');
   const [daysOff, setDaysOff] = useState('7');
   const [times, setTimes] = useState<string[]>(['08:00']);
-  const [startDate, setStartDate] = useState(todayStr());
+  const [startDate, setStartDate] = useState(localDateStr());
 
   // ── Navigation
   const [step, setStep] = useState(0);
