@@ -13,8 +13,6 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
-
 // Icones extraidos de modelo_exemplo.png (traco branco com alpha), coloridos
 // via tintColor conforme o estado selecionado/nao selecionado do botao.
 const TAB_ICON_SOURCES = {
@@ -23,6 +21,15 @@ const TAB_ICON_SOURCES = {
   calendar: require('@/assets/images/tab-icons/schedule.png'),
   scan: require('@/assets/images/tab-icons/scan.png'),
 } as const;
+
+// Ponte metaball pre-rasterizada a partir da curva de BRIDGE_PROFILE (perfil
+// dx/R, altura/R -- ver comentario abaixo). PNG e uma mascara branca; a cor
+// real vem de tintColor (NAV_DARK) no BridgeConnector, entao mudar NAV_DARK
+// no futuro nao dessincroniza a ponte das cápsulas. Usar Image em vez de
+// react-native-svg aqui contorna um bug de renderizacao do Fabric no iOS onde
+// o <Svg> nessa posicao (entre dois irmaos de zIndex maior, com
+// marginHorizontal negativo) exibe conteudo de camada corrompido/reciclado.
+const BRIDGE_CONNECTOR_SOURCE = require('@/assets/images/tab-icons/bridge-connector.png');
 
 const BTN_D = 60;
 const CAPSULE_PAD = 10;
@@ -57,66 +64,6 @@ const BRIDGE_PROFILE: readonly (readonly [number, number])[] = [
   [1.159, 1.0],
 ];
 const BRIDGE_HALF_SPAN_RATIO = BRIDGE_PROFILE.at(-1)![0];
-
-function catmullRomControlPoints(
-  p0: readonly [number, number],
-  p1: readonly [number, number],
-  p2: readonly [number, number],
-  p3: readonly [number, number]
-) {
-  return {
-    c1x: p1[0] + (p2[0] - p0[0]) / 6,
-    c1y: p1[1] + (p2[1] - p0[1]) / 6,
-    c2x: p2[0] - (p3[0] - p1[0]) / 6,
-    c2y: p2[1] - (p3[1] - p1[1]) / 6,
-  };
-}
-
-// toFixed evita notacao cientifica (ex.: "1e-15" de erro de ponto flutuante
-// perto de zero), que o parser nativo do svg (horcrux) nao entende.
-function fmt(n: number): string {
-  return n.toFixed(3);
-}
-
-function pathThroughPoints(points: (readonly [number, number])[]): string {
-  let d = `M ${fmt(points[0][0])} ${fmt(points[0][1])}`;
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[Math.max(i - 1, 0)];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[Math.min(i + 2, points.length - 1)];
-    const { c1x, c1y, c2x, c2y } = catmullRomControlPoints(p0, p1, p2, p3);
-    d += ` C ${fmt(c1x)} ${fmt(c1y)}, ${fmt(c2x)} ${fmt(c2y)}, ${fmt(p2[0])} ${fmt(p2[1])}`;
-  }
-  return d;
-}
-
-/** Path SVG fechado (topo + baixo espelhado) da ponte metaball, para uma cápsula de altura 2R. */
-function buildBridgePath(R: number): { d: string; width: number; height: number } {
-  const height = R * 2;
-  const halfSpan = BRIDGE_HALF_SPAN_RATIO * R;
-  const width = halfSpan * 2;
-
-  const left = [...BRIDGE_PROFILE]
-    .reverse()
-    .map(([dxN, hN]) => [halfSpan - dxN * R, R - hN * R] as const);
-  const right = BRIDGE_PROFILE.slice(1).map(
-    ([dxN, hN]) => [halfSpan + dxN * R, R - hN * R] as const
-  );
-  const top = [...left, ...right];
-  const bottom = [...top].reverse().map(([x, y]) => [x, height - y] as const);
-
-  const topD = pathThroughPoints(top);
-  // Remove o "M x y" inicial do path de baixo -- a reta vertical explícita
-  // abaixo já leva a caneta até esse mesmo ponto (borda direita, plena altura).
-  const bottomD = pathThroughPoints(bottom).replace(/^M [\d.-]+ [\d.-]+ /, '');
-
-  return {
-    d: `${topD} L ${fmt(bottom[0][0])} ${fmt(bottom[0][1])} ${bottomD} Z`,
-    width,
-    height,
-  };
-}
 
 type ActiveTab = 'home' | 'meds' | 'calendar' | 'schedules' | 'scan';
 
@@ -281,12 +228,16 @@ type BridgeConnectorProps = Readonly<{
  */
 function BridgeConnector({ height }: BridgeConnectorProps) {
   const R = height / 2;
-  const { d, width } = buildBridgePath(R);
+  const width = BRIDGE_HALF_SPAN_RATIO * 2 * R;
 
   return (
-    <Svg width={width} height={height} style={{ marginHorizontal: -R }} pointerEvents="none">
-      <Path d={d} fill={NAV_DARK} />
-    </Svg>
+    <View style={{ marginHorizontal: -R }} pointerEvents="none">
+      <Image
+        source={BRIDGE_CONNECTOR_SOURCE}
+        style={{ width, height, tintColor: NAV_DARK }}
+        resizeMode="stretch"
+      />
+    </View>
   );
 }
 
