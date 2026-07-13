@@ -1,16 +1,18 @@
 import {
   generateDosesForSchedule,
   getDosesForDateRange,
+  regenerateFutureDosesForSchedule,
   updateDoseNotificationId,
   updateDoseStatus,
 } from '@/lib/database';
-import { finalizeNewSchedule } from '@/lib/dose-scheduling';
+import { finalizeNewSchedule, finalizeScheduleUpdate } from '@/lib/dose-scheduling';
 import { scheduleDoseNotification } from '@/lib/notifications';
 import type { Dose, Schedule } from '@/types';
 
 jest.mock('@/lib/database', () => ({
   generateDosesForSchedule: jest.fn(),
   getDosesForDateRange: jest.fn(),
+  regenerateFutureDosesForSchedule: jest.fn(),
   updateDoseNotificationId: jest.fn(),
   updateDoseStatus: jest.fn(),
 }));
@@ -20,6 +22,7 @@ jest.mock('@/lib/notifications', () => ({
 }));
 
 const mockGenerate = generateDosesForSchedule as jest.Mock;
+const mockRegenerate = regenerateFutureDosesForSchedule as jest.Mock;
 const mockGetRange = getDosesForDateRange as jest.Mock;
 const mockUpdateNotificationId = updateDoseNotificationId as jest.Mock;
 const mockUpdateStatus = updateDoseStatus as jest.Mock;
@@ -123,6 +126,80 @@ describe('finalizeNewSchedule', () => {
     mockGetRange.mockResolvedValueOnce([]);
 
     await finalizeNewSchedule(baseSchedule, 'Dipirona');
+
+    expect(mockGetRange).toHaveBeenCalledWith('2026-07-07', '2026-07-13');
+  });
+
+  it('usa a data local (não UTC) para "hoje", mesmo à noite em fusos atrás de UTC', async () => {
+    // Sistema em fuso atrás de UTC (ex.: America/Manaus, UTC-4). 22h local de
+    // 07/07 já é 02h UTC de 08/07 -- se "hoje" usasse toISOString() (UTC), a
+    // janela pularia pra 08/07 e excluiria doses de hoje ainda no futuro
+    // (ex.: uma dose às 00:00), que nunca receberiam notificação agendada.
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-07T22:00:00'));
+    mockGetRange.mockResolvedValueOnce([]);
+
+    await finalizeNewSchedule(baseSchedule, 'Dipirona');
+
+    expect(mockGetRange).toHaveBeenCalledWith('2026-07-07', '2026-07-13');
+  });
+});
+
+describe('finalizeScheduleUpdate', () => {
+  it('regenera as doses futuras do schedule antes de qualquer outra coisa', async () => {
+    mockGetRange.mockResolvedValueOnce([]);
+
+    await finalizeScheduleUpdate(baseSchedule, 'Dipirona');
+
+    expect(mockRegenerate).toHaveBeenCalledWith(baseSchedule, 30);
+  });
+
+  it('agenda notificação e persiste notification_id para doses pending futuras', async () => {
+    const futureDose = makeDose({ id: 20, scheduledTime: '2026-07-07T15:00:00' });
+    mockGetRange.mockResolvedValueOnce([futureDose]);
+    mockScheduleNotification.mockResolvedValueOnce('notif-xyz');
+
+    await finalizeScheduleUpdate(baseSchedule, 'Dipirona');
+
+    expect(mockScheduleNotification).toHaveBeenCalledWith({
+      id: 20,
+      medicineName: 'Dipirona',
+      dosage: baseSchedule.dosage,
+      scheduledTime: futureDose.scheduledTime,
+    });
+    expect(mockUpdateNotificationId).toHaveBeenCalledWith(20, 'notif-xyz');
+  });
+
+  it('ignora doses que não estão mais pending (tomadas/puladas/adiadas)', async () => {
+    const takenDose = makeDose({ id: 21, status: 'taken' });
+    mockGetRange.mockResolvedValueOnce([takenDose]);
+
+    await finalizeScheduleUpdate(baseSchedule, 'Dipirona');
+
+    expect(mockScheduleNotification).not.toHaveBeenCalled();
+  });
+
+  it('ignora doses de outros schedules retornadas na mesma janela', async () => {
+    const otherScheduleDose = makeDose({ id: 22, scheduleId: 999 });
+    mockGetRange.mockResolvedValueOnce([otherScheduleDose]);
+
+    await finalizeScheduleUpdate(baseSchedule, 'Dipirona');
+
+    expect(mockScheduleNotification).not.toHaveBeenCalled();
+  });
+
+  it('consulta getDosesForDateRange com janela de hoje até hoje+6', async () => {
+    mockGetRange.mockResolvedValueOnce([]);
+
+    await finalizeScheduleUpdate(baseSchedule, 'Dipirona');
+
+    expect(mockGetRange).toHaveBeenCalledWith('2026-07-07', '2026-07-13');
+  });
+
+  it('usa a data local (não UTC) para "hoje", mesmo à noite em fusos atrás de UTC', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-07T22:00:00'));
+    mockGetRange.mockResolvedValueOnce([]);
+
+    await finalizeScheduleUpdate(baseSchedule, 'Dipirona');
 
     expect(mockGetRange).toHaveBeenCalledWith('2026-07-07', '2026-07-13');
   });
