@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useDatesWithDosesInMonth, useDosesForDate } from '@/hooks/use-doses';
 import { useTheme } from '@/hooks/use-theme';
+import { DOSE_STATUS_LABEL, getDisplayStatus, type DisplayStatus } from '@/lib/dose-status';
 import { useAppStore } from '@/lib/store';
 import { ScreenHeader, headerBtnStyle } from '@/components/ui/header/ScreenHeader';
 import { Text } from '@/components/ui/text/Text';
@@ -55,14 +56,30 @@ function getFirstDayOfMonth(year: number, month: number) {
 
 // ─── DoseItem ─────────────────────────────────────────────────────────────────
 
+// Icone + cor por status -- nunca só a cor, pra nao depender de percepcao de
+// cor (daltonismo e comum, principalmente em homens 60+, publico frequente
+// de tratamento continuo).
+const STATUS_ICON: Record<DisplayStatus, keyof typeof Ionicons.glyphMap> = {
+  taken: 'checkmark-circle',
+  late: 'alert-circle',
+  skipped: 'close-circle',
+  snoozed: 'time',
+  pending: 'ellipse-outline',
+};
+
 function DoseItem({ item }: Readonly<{ item: Dose }>) {
   const C = useTheme();
 
-  const DOT_COLOR: Record<string, string> = {
+  const DOT_COLOR: Record<DisplayStatus, string> = {
     taken: C.success,
+    late: C.danger,
     skipped: C.danger,
+    snoozed: C.warning,
+    pending: C.primary,
   };
-  const dotColor = DOT_COLOR[item.status] ?? C.primary;
+  const displayStatus = getDisplayStatus(item);
+  const dotColor = DOT_COLOR[displayStatus];
+  const statusIcon = STATUS_ICON[displayStatus];
 
   return (
     <Card variant="flat" style={styles.doseItem}>
@@ -81,7 +98,12 @@ function DoseItem({ item }: Readonly<{ item: Dose }>) {
           </Text>
         ) : null}
       </View>
-      <View style={[styles.statusDot, { backgroundColor: dotColor }]} />
+      <Ionicons
+        name={statusIcon}
+        size={18}
+        color={dotColor}
+        accessibilityLabel={DOSE_STATUS_LABEL[displayStatus]}
+      />
     </Card>
   );
 }

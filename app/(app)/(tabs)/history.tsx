@@ -76,7 +76,7 @@ function sectionDateLabel(dateStr: string): string {
 
 function AdherenceBar({ pct, color }: Readonly<{ pct: number; color: string }>) {
   return (
-    <View style={barStyles.track}>
+    <View style={barStyles.track} importantForAccessibility="no-hide-descendants">
       <View style={[barStyles.fill, { height: `${pct * 100}%`, backgroundColor: color }]} />
     </View>
   );
@@ -288,8 +288,17 @@ export default function HistoryScreen() {
               const color = barColorForPct(pct, C.success, C.warning, C.danger, C.border);
               const dow = new Date(`${dateStr}T12:00:00`).getDay();
               const isToday = dateStr === todayKey;
+              const a11yLabel =
+                row && row.total > 0
+                  ? `${DAYS_SHORT[dow]}: ${Math.round(pct * 100)}% de adesão`
+                  : `${DAYS_SHORT[dow]}: sem doses registradas`;
               return (
-                <View key={dateStr} style={styles.barCol}>
+                <View
+                  key={dateStr}
+                  style={styles.barCol}
+                  accessible
+                  accessibilityLabel={a11yLabel}
+                >
                   <AdherenceBar pct={pct} color={color} />
                   <Text
                     variant="caption"

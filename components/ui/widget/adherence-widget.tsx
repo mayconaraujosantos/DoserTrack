@@ -60,9 +60,23 @@ export function AdherenceWidget() {
             ? rateColor(rate, C.success, C.warning, C.danger, C.border)
             : C.border;
           const height = hasData && rate > 0 ? Math.max(6, Math.round(rate * 32)) : 6;
+          // A altura da barra já ajuda na comparação relativa (nao depende de
+          // cor), mas a faixa boa/ok/ruim em si so é cor -- reforça com o
+          // percentual exato no rotulo pra leitor de tela.
+          const a11yLabel = hasData
+            ? `${label}: ${Math.round(rate * 100)}% de adesão`
+            : `${label}: sem doses registradas`;
           return (
-            <View key={key} style={styles.barCol}>
-              <View style={[styles.barTrack, { backgroundColor: C.bg }]}>
+            <View
+              key={key}
+              style={styles.barCol}
+              accessible
+              accessibilityLabel={a11yLabel}
+            >
+              <View
+                style={[styles.barTrack, { backgroundColor: C.bg }]}
+                importantForAccessibility="no-hide-descendants"
+              >
                 <View style={[styles.barFill, { height, backgroundColor: color }]} />
               </View>
               <Text variant="caption" color={C.sub} style={styles.barLabel}>

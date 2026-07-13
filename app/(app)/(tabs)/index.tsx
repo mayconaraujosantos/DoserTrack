@@ -88,6 +88,27 @@ const STATUS_DOT_COLOR: Record<DayStatus, string> = {
   has_pending: '#F9C74F',
 };
 
+// Rótulo por extenso pra leitor de tela -- o ponto de 5px não cabe ícone, só
+// cor não é suficiente pra daltonismo (comum no público de tratamento
+// contínuo), então a forma também varia por status (ver dotShapeStyle).
+const DAY_STATUS_LABEL: Record<DayStatus, string> = {
+  all_taken: 'todas as doses tomadas',
+  has_late: 'tem dose atrasada',
+  has_pending: 'tem dose pendente',
+};
+
+// Além da cor, cada status tem uma forma diferente (bolinha cheia / quadrado
+// / anel vazado) pra continuar distinguível em escala de cinza.
+function dotShapeStyle(status: DayStatus, color: string) {
+  if (status === 'has_late') {
+    return { backgroundColor: color, borderRadius: 1 };
+  }
+  if (status === 'has_pending') {
+    return { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: color };
+  }
+  return { backgroundColor: color, borderRadius: 3 };
+}
+
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'Todos' },
   { key: 'pending', label: 'Pendentes' },
@@ -253,7 +274,7 @@ function DayCell({
       }}
       activeOpacity={1}
       accessibilityRole="button"
-      accessibilityLabel={`Dia ${day}`}
+      accessibilityLabel={`Dia ${day}${status ? `, ${DAY_STATUS_LABEL[status]}` : ''}`}
       accessibilityState={{ selected: isSelected }}
     >
       <Animated.View
@@ -277,7 +298,9 @@ function DayCell({
             <View style={[styles.todayDot, { backgroundColor: C.primary }]} />
           )}
           {status && (
-            <View style={[styles.statusDot, { backgroundColor: STATUS_DOT_COLOR[status] }]} />
+            <View
+              style={[styles.statusDot, dotShapeStyle(status, STATUS_DOT_COLOR[status])]}
+            />
           )}
         </View>
       </Animated.View>
