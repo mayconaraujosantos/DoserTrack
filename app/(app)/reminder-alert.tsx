@@ -102,8 +102,8 @@ const styles = StyleSheet.create({
   skipBtnText: { fontSize: 15, color: DARK.sub },
   btnDisabled: { opacity: 0.5 },
   snoozeConfirmBtn: {
-    height: 40,
-    borderRadius: 12,
+    height: 48,
+    borderRadius: 14,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
