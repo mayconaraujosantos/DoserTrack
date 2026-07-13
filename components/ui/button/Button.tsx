@@ -18,7 +18,8 @@ interface ButtonProps extends TouchableOpacityProps {
   children: React.ReactNode;
 }
 
-const HEIGHT: Record<ButtonSize, number> = { sm: 36, md: 48, lg: 52 };
+// sm nunca abaixo do minimo de toque acessivel (44dp), mesmo sem call sites hoje.
+const HEIGHT: Record<ButtonSize, number> = { sm: 44, md: 48, lg: 52 };
 const FONT_SIZE: Record<ButtonSize, number> = { sm: 13, md: 15, lg: 16 };
 const H_PAD: Record<ButtonSize, number> = { sm: 14, md: 18, lg: 22 };
 const RADIUS: Record<ButtonSize, number> = { sm: 10, md: 12, lg: 14 };

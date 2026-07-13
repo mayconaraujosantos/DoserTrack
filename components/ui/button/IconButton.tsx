@@ -16,7 +16,9 @@ export function IconButton({
   name,
   variant = 'default',
   size = 18,
-  boxSize = 36,
+  // Minimo de toque acessivel por padrao -- call sites que precisam de um
+  // botao visualmente menor devem sobrescrever boxSize conscientemente.
+  boxSize = 44,
   style,
   accessibilityLabel,
   ...rest
