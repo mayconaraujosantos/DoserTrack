@@ -1,6 +1,9 @@
 import type * as SQLite from 'expo-sqlite';
 import { getDb } from './connection';
 
+/** Vocabulário de tipos do domínio para valores de bind — isola quem consome `lib/database` do tipo concreto do driver SQLite. */
+export type SqlParams = SQLite.SQLiteBindValue[];
+
 export async function getAllRows<T = Record<string, unknown>>(
   sql: string,
   params?: SQLite.SQLiteBindParams

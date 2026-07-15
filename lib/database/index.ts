@@ -1,6 +1,7 @@
 export { getActiveProfileId, setActiveProfileId } from './connection';
 export { initDatabase } from './schema';
 export { getAllRows, getFirstRow, runQuery } from './raw-query';
+export type { SqlParams } from './raw-query';
 export {
   clearPrescriptionCache,
   getCachedPrescriptionByHash,

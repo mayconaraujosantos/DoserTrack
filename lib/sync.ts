@@ -1,7 +1,7 @@
 import { getAllRows, runQuery } from '@/lib/database';
+import type { SqlParams } from '@/lib/database';
 import { logger } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
-import type { SQLiteBindValue } from 'expo-sqlite';
 
 const log = logger.make('Sync');
 
@@ -10,7 +10,7 @@ interface TableSyncConfig {
   toCloud: (row: Record<string, unknown>, userId: string) => Record<string, unknown>;
   insertColumns: string[];
   updateColumns: string[]; // inclui 'updated_at'; nunca inclui id/profile_id/created_at
-  toLocalParams: (row: Record<string, unknown>) => SQLiteBindValue[]; // mesma ordem de insertColumns
+  toLocalParams: (row: Record<string, unknown>) => SqlParams; // mesma ordem de insertColumns
 }
 
 const TABLES: TableSyncConfig[] = [
@@ -62,7 +62,7 @@ const TABLES: TableSyncConfig[] = [
         m.low_stock_threshold,
         m.created_at,
         m.updated_at ?? null,
-      ] as SQLiteBindValue[],
+      ] as SqlParams,
   },
   {
     table: 'schedules',
@@ -111,7 +111,7 @@ const TABLES: TableSyncConfig[] = [
         s.is_active ? 1 : 0,
         s.created_at,
         s.updated_at ?? null,
-      ] as SQLiteBindValue[],
+      ] as SqlParams,
   },
   {
     table: 'doses',
@@ -156,7 +156,7 @@ const TABLES: TableSyncConfig[] = [
         d.notification_id ?? null,
         d.created_at,
         d.updated_at ?? null,
-      ] as SQLiteBindValue[],
+      ] as SqlParams,
   },
 ];
 
