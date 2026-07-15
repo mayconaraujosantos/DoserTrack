@@ -1,24 +1,35 @@
+import { useTheme } from '@/hooks/use-theme';
+import { mapAuthError, signIn } from '@/lib/auth';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  Pressable,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Keyboard,
-  Platform,
-  ActivityIndicator,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { signIn, mapAuthError } from '@/lib/auth';
-import { useTheme } from '@/hooks/use-theme';
 
 function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const normalized = email.trim();
+
+  if (!normalized) return false;
+  if (Array.from(normalized).some(character => character.trim().length === 0)) return false;
+
+  const [localPart, domainPart, ...extraParts] = normalized.split('@');
+
+  if (!localPart || !domainPart || extraParts.length > 0) return false;
+
+  const domainParts = domainPart.split('.');
+
+  return domainParts.length >= 2 && domainParts.every(part => part.length > 0);
 }
 
 export default function LoginScreen() {
