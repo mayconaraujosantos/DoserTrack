@@ -20,7 +20,7 @@ afterEach(() => {
 });
 
 describe('getPendingDosesWithoutNotification', () => {
-  it('não usa mais datetime(\'now\') do SQLite (UTC) para comparar com scheduled_time (local)', async () => {
+  it("não usa mais datetime('now') do SQLite (UTC) para comparar com scheduled_time (local)", async () => {
     const mockGetAllAsync = jest.fn().mockResolvedValue([]);
     setDb(fakeDb(mockGetAllAsync));
 
@@ -77,7 +77,7 @@ describe('getPendingDosesWithoutNotification', () => {
 });
 
 describe('getWeekAdherence', () => {
-  it('não usa mais date(\'now\') do SQLite (UTC); passa hoje e hoje-6 como datas locais', async () => {
+  it("não usa mais date('now') do SQLite (UTC); passa hoje e hoje-6 como datas locais", async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-07-07T22:00:00'));
     const mockGetAllAsync = jest.fn().mockResolvedValue([]);
     setDb(fakeDb(mockGetAllAsync));
@@ -91,7 +91,7 @@ describe('getWeekAdherence', () => {
 });
 
 describe('getAdherenceStreak', () => {
-  it('não usa mais date(\'now\') do SQLite (UTC) como limite superior', async () => {
+  it("não usa mais date('now') do SQLite (UTC) como limite superior", async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-07-07T22:00:00'));
     const mockGetAllAsync = jest.fn().mockResolvedValue([]);
     setDb(fakeDb(mockGetAllAsync));
@@ -118,7 +118,7 @@ describe('getAdherenceStreak', () => {
 });
 
 describe('getRecentHistory', () => {
-  it('não usa mais date(\'now\') do SQLite (UTC) como limite superior', async () => {
+  it("não usa mais date('now') do SQLite (UTC) como limite superior", async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-07-07T22:00:00'));
     const mockGetAllAsync = jest.fn().mockResolvedValue([]);
     setDb(fakeDb(mockGetAllAsync));

@@ -298,9 +298,7 @@ function DayCell({
             <View style={[styles.todayDot, { backgroundColor: C.primary }]} />
           )}
           {status && (
-            <View
-              style={[styles.statusDot, dotShapeStyle(status, STATUS_DOT_COLOR[status])]}
-            />
+            <View style={[styles.statusDot, dotShapeStyle(status, STATUS_DOT_COLOR[status])]} />
           )}
         </View>
       </Animated.View>

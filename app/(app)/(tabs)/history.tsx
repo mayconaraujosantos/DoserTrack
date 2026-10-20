@@ -293,12 +293,7 @@ export default function HistoryScreen() {
                   ? `${DAYS_SHORT[dow]}: ${Math.round(pct * 100)}% de adesão`
                   : `${DAYS_SHORT[dow]}: sem doses registradas`;
               return (
-                <View
-                  key={dateStr}
-                  style={styles.barCol}
-                  accessible
-                  accessibilityLabel={a11yLabel}
-                >
+                <View key={dateStr} style={styles.barCol} accessible accessibilityLabel={a11yLabel}>
                   <AdherenceBar pct={pct} color={color} />
                   <Text
                     variant="caption"

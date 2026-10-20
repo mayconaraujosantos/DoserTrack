@@ -67,12 +67,7 @@ export function AdherenceWidget() {
             ? `${label}: ${Math.round(rate * 100)}% de adesão`
             : `${label}: sem doses registradas`;
           return (
-            <View
-              key={key}
-              style={styles.barCol}
-              accessible
-              accessibilityLabel={a11yLabel}
-            >
+            <View key={key} style={styles.barCol} accessible accessibilityLabel={a11yLabel}>
               <View
                 style={[styles.barTrack, { backgroundColor: C.bg }]}
                 importantForAccessibility="no-hide-descendants"
