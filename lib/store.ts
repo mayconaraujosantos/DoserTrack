@@ -1,9 +1,6 @@
 import { create } from 'zustand';
+import { localDateStr } from '@/lib/date';
 import type { Profile } from '@/types';
-
-function todayStr(): string {
-  return new Date().toISOString().split('T')[0];
-}
 
 interface AppStore {
   selectedDate: string;
@@ -15,7 +12,7 @@ interface AppStore {
 }
 
 export const useAppStore = create<AppStore>(set => ({
-  selectedDate: todayStr(),
+  selectedDate: localDateStr(),
   setSelectedDate: date => set({ selectedDate: date }),
   dbReady: false,
   setDbReady: ready => set({ dbReady: ready }),

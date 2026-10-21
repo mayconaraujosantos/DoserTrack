@@ -179,7 +179,7 @@ function MedicineRow({
           <TouchableOpacity
             onPress={showMenu}
             style={styles.menuBtn}
-            hitSlop={{ top: 12, bottom: 12, left: 8, right: 4 }}
+            hitSlop={{ top: 12, bottom: 12, left: 10, right: 8 }}
             accessibilityLabel={`Menu de opções para ${medicine.name}`}
           >
             <Ionicons name="ellipsis-vertical" size={18} color={C.sub} />

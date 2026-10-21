@@ -1,22 +1,28 @@
+import { useTheme } from '@/hooks/use-theme';
+import { mapAuthError, sendPasswordReset } from '@/lib/auth';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { sendPasswordReset, mapAuthError } from '@/lib/auth';
-import { useTheme } from '@/hooks/use-theme';
 
 function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const value = email.trim();
+  const atIndex = value.indexOf('@');
+  if (atIndex <= 0 || atIndex !== value.lastIndexOf('@')) return false;
+
+  const domain = value.slice(atIndex + 1);
+  const dotIndex = domain.indexOf('.');
+  return dotIndex > 0 && dotIndex < domain.length - 1 && !/\s/.test(value);
 }
 
 export default function ForgotPasswordScreen() {
@@ -143,9 +149,9 @@ const styles = StyleSheet.create({
   },
   backBtn: {},
   backCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',

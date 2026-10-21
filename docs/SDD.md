@@ -142,7 +142,7 @@ O Doser adota arquitetura **local-first**: o SQLite é a fonte de verdade primá
 │   └──────────────────┘  └──────────────────────────┘   │
 ├─────────────────────────────────────────────────────────┤
 │                    Camada de Serviços (lib/)            │
-│   database.ts │ auth.ts │ sync.ts │ notifications.ts   │
+│   database/   │ auth.ts │ sync.ts │ notifications.ts   │
 │   scanner     │ report  │ storage │ biometrics         │
 ├─────────────────────────────────────────────────────────┤
 │                    Camada de Dados                      │
@@ -151,6 +151,45 @@ O Doser adota arquitetura **local-first**: o SQLite é a fonte de verdade primá
 │   │  (doser.db)      │ sync │  (cloud backup)       │   │
 │   └──────────────────┘      └──────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
+```
+
+**Dependências entre módulos** (equivalente ao diagrama acima, em formato navegável):
+
+```mermaid
+graph TD
+  subgraph Apresentação
+    Screens["app/ (rotas Expo Router)"]
+  end
+  subgraph Estado
+    Zustand["lib/store.ts (Zustand)"]
+    RQ["React Query (hooks de dados)"]
+  end
+  subgraph "Serviços (lib/)"
+    DB["database/"]
+    Sync["sync.ts"]
+    Notif["notifications.ts"]
+    Scanner["medicine-scanner.ts / prescription-scanner.ts"]
+    Auth["auth.ts"]
+    Report["report.ts"]
+  end
+  subgraph Dados
+    SQLite[("SQLite local")]
+    Supabase[("Supabase — Postgres + Auth + Edge Functions")]
+  end
+
+  Screens --> Zustand
+  Screens --> RQ
+  RQ --> DB
+  RQ --> Notif
+  Screens --> Scanner
+  Screens --> Auth
+  Screens --> Report
+  DB --> SQLite
+  Sync --> DB
+  Sync --> Supabase
+  Auth --> Supabase
+  Scanner --> Supabase
+  Report --> DB
 ```
 
 ### Roteamento e Proteção
@@ -371,18 +410,26 @@ Espelha o schema SQLite com adição de `user_id` (UUID do Supabase Auth) para m
 
 ## 7. Módulos e Responsabilidades
 
-### `lib/database.ts`
+### `lib/database/`
 
-Única interface com o SQLite. Todas as queries passam por aqui.
+Única interface com o SQLite (importada como `@/lib/database`). Todas as queries passam
+por aqui. Dividida por domínio — sem chamadas cruzadas entre arquivos via função, cada um
+faz SQL/JOIN direto quando precisa de dados de outra tabela:
 
-**Responsabilidades:**
+| Arquivo        | Responsabilidade                                                              |
+| -------------- | ----------------------------------------------------------------------------- |
+| `db.ts`        | Conexão SQLite, `activeProfileId`, migrações (`ensureColumn`), `initDatabase` |
+| `mappers.ts`   | `rowToProfile`/`rowToMedicine`/`rowToSchedule`/`rowToDose` (puros)            |
+| `profiles.ts`  | CRUD de profiles                                                              |
+| `medicines.ts` | CRUD de medicines                                                             |
+| `schedules.ts` | CRUD de schedules                                                             |
+| `doses.ts`     | CRUD/histórico/adesão de doses, geração de doses, realinhamento de intervalo  |
+| `stock.ts`     | Projeção de estoque                                                           |
+| `cache.ts`     | Cache de resultado de scan (`prescription_cache`)                             |
+| `index.ts`     | Reexporta tudo — o import `@/lib/database` não muda para quem consome         |
 
-- Inicialização e migração do banco
-- CRUD de profiles, medicines, schedules, doses
-- Geração de doses a partir de schedules
-- Realinhamento de doses de intervalo
-- Projeção de estoque
-- Métricas de adesão (streak, adherence por dia)
+A geração de doses e a projeção de estoque delegam o cálculo por `FrequencyType` para
+`lib/frequency-strategy.ts` (Strategy — um objeto por tipo, ver ADR correspondente).
 
 **Invariante crítico:** toda função de escrita exige `activeProfileId` configurado via `setActiveProfileId()`. Isso garante isolamento de dados entre perfis.
 
@@ -414,6 +461,8 @@ Sincronização bidirecional SQLite ↔ Supabase.
 - `pullFromCloud()`: download e merge no SQLite local
 - **Conflito:** last-write-wins via `updated_at`
 - Disparado ao abrir o app (foreground) e ao fazer login
+- Tradução linha local ↔ linha da nuvem (Adapter) formalizada em 6 funções puras exportadas
+  (`medicineToCloudRow`/`medicineFromCloudRowParams` e equivalentes para schedule/dose)
 
 ### `lib/notifications.ts`
 
@@ -451,7 +500,11 @@ Autenticação biométrica opcional (fingerprint/Face ID).
 
 ### `lib/medicine-scanner.ts` / `lib/prescription-scanner.ts`
 
-Chamam Supabase Edge Functions que invocam Gemini Vision para extrair dados estruturados de imagens.
+Chamam Supabase Edge Functions que invocam Gemini Vision para extrair dados estruturados de
+imagens. A tradução resposta bruta → tipo de domínio (Adapter) é feita por
+`parseMedicinePackageResponse`/`parsePrescriptionResponse`. `prescription-scanner.ts`
+também expõe `prescriptionItemToFrequencyConfig`, que traduz um item de receita
+(`PrescriptionData`) para o `FrequencyConfig` usado ao criar o schedule.
 
 **Retorno do scan de embalagem:**
 
@@ -556,6 +609,25 @@ Login bem-sucedido  ──►  sync.ts.pullFromCloud()
     └─ SELECT * FROM supabase WHERE user_id = ?  →  INSERT OR REPLACE INTO sqlite
 ```
 
+```mermaid
+sequenceDiagram
+  participant App
+  participant Sync as lib/sync.ts
+  participant SQLite
+  participant Supabase
+
+  Note over App: Retorno ao foreground
+  App->>Sync: syncToCloud()
+  Sync->>SQLite: SELECT * FROM medicines/schedules/doses
+  Sync->>Supabase: upsert(rows) ON CONFLICT(id)
+  Supabase-->>Sync: ok ou erro (logado; não interrompe as demais tabelas)
+
+  Note over App: Login bem-sucedido
+  App->>Sync: pullFromCloud()
+  Sync->>Supabase: SELECT * WHERE user_id = ?
+  Sync->>SQLite: INSERT ... ON CONFLICT(id) DO UPDATE<br/>WHERE excluded.updated_at > local.updated_at
+```
+
 ---
 
 ## 9. Algoritmos-Chave
@@ -597,6 +669,17 @@ for each day in [now .. finalEnd]:
 ```
 
 **Idempotência:** antes de cada INSERT, verifica `SELECT id FROM doses WHERE schedule_id = ? AND scheduled_time = ?`. Isso permite re-executar geração sem duplicatas.
+
+```mermaid
+flowchart TD
+  A["generateDosesForSchedule(schedule)"] --> B{"schedule.frequencyConfig.type"}
+  B -->|interval_hours| C["intervalHoursStrategy.buildDates"]
+  B -->|specific_days| D["specificDaysStrategy.buildDates"]
+  B -->|fixed_cycle| E["fixedCycleStrategy.buildDates"]
+  C --> F["Para cada data: INSERT dose se ainda não existe"]
+  D --> F
+  E --> F
+```
 
 ### 9.2 Realinhamento de Intervalo (`realignIntervalSchedule`)
 
@@ -795,6 +878,12 @@ Configuração em `eas.json`. Profiles: `development`, `preview`, `production`.
 
 **Decisão:** Chamadas ao Gemini Vision passam pelo Supabase Edge Function, não diretamente do app.  
 **Razão:** Evita expor a API key do Gemini no bundle do app. Edge Functions rodam em ambiente controlado (Deno) com acesso seguro às variáveis de ambiente.
+
+### ADR-007: Sem Dependency Injection formal entre telas e `lib/database`/`lib/supabase`
+
+**Decisão:** Telas e hooks de React Query importam diretamente as funções de `@/lib/database` e `@/lib/supabase` — não existe container de DI nem camada de interfaces abstratas para inverter essa dependência.  
+**Razão:** `lib/database/index.ts` já atua como fachada única (Abstract Server) sobre o SQLite, o que cobre a necessidade prática de esconder o driver concreto. Para o porte atual do app (single-developer, sem múltiplas implementações de storage a suportar), DI formal adicionaria indireção sem um consumidor real para a abstração. Nos testes, `jest.mock('@/lib/database')` substitui o módulo inteiro sem precisar de injeção.  
+**Trade-off:** o acoplamento é direto — trocar o SQLite por outra engine de storage, ou introduzir um backend alternativo ao Supabase, exigiria alterar os pontos de chamada, não apenas uma implementação injetada. Se o app crescer para múltiplos backends de dados ou precisar de test doubles mais finos que `jest.mock`, revisitar esta decisão.
 
 ---
 

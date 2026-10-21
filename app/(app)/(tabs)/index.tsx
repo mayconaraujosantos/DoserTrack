@@ -4,6 +4,7 @@ import { useDosesForDate, useDosesForDateRange } from '@/hooks/use-doses';
 import { useMedicines } from '@/hooks/use-medicines';
 import { useTheme } from '@/hooks/use-theme';
 import { updateDoseStatus } from '@/lib/database';
+import { DOSE_STATUS_LABEL, getDisplayStatus, type DisplayStatus } from '@/lib/dose-status';
 import { haptic } from '@/lib/haptics';
 import { invalidateTrackingQueries } from '@/lib/query-keys';
 import { useAppStore } from '@/lib/store';
@@ -67,23 +68,14 @@ function useHomeColors(): HomeColors {
 
 // ─── Status display ───────────────────────────────────────────────────────────
 
-const STATUS_COLOR = {
+const STATUS_COLOR: Record<DisplayStatus, string> = {
   taken: '#4ECDC4',
   late: '#FF6B6B',
   pending: '#F9C74F',
   snoozed: '#F4A261',
   skipped: '#9294B0',
-} as const;
+};
 
-const STATUS_LABEL = {
-  taken: 'Tomado',
-  late: 'Atrasado',
-  pending: 'Pendente',
-  snoozed: 'Adiado',
-  skipped: 'Pulado',
-} as const;
-
-type DisplayStatus = keyof typeof STATUS_COLOR;
 type FilterKey = 'all' | 'pending' | 'taken' | 'late';
 
 // ─── Day status (for calendar dots) ──────────────────────────────────────────
@@ -95,6 +87,27 @@ const STATUS_DOT_COLOR: Record<DayStatus, string> = {
   has_late: '#FF6B6B',
   has_pending: '#F9C74F',
 };
+
+// Rótulo por extenso pra leitor de tela -- o ponto de 5px não cabe ícone, só
+// cor não é suficiente pra daltonismo (comum no público de tratamento
+// contínuo), então a forma também varia por status (ver dotShapeStyle).
+const DAY_STATUS_LABEL: Record<DayStatus, string> = {
+  all_taken: 'todas as doses tomadas',
+  has_late: 'tem dose atrasada',
+  has_pending: 'tem dose pendente',
+};
+
+// Além da cor, cada status tem uma forma diferente (bolinha cheia / quadrado
+// / anel vazado) pra continuar distinguível em escala de cinza.
+function dotShapeStyle(status: DayStatus, color: string) {
+  if (status === 'has_late') {
+    return { backgroundColor: color, borderRadius: 1 };
+  }
+  if (status === 'has_pending') {
+    return { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: color };
+  }
+  return { backgroundColor: color, borderRadius: 3 };
+}
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'all', label: 'Todos' },
@@ -135,14 +148,6 @@ function formatTime(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-function getDisplayStatus(dose: Dose): DisplayStatus {
-  if (dose.status === 'taken') return 'taken';
-  if (dose.status === 'skipped') return 'skipped';
-  if (dose.status === 'snoozed') return 'snoozed';
-  if (new Date(dose.scheduledTime) < new Date()) return 'late';
-  return 'pending';
 }
 
 function getSundayOf(dateStr: string): string {
@@ -189,7 +194,7 @@ function DoseCard({
       onPress={() => onPress(dose.id)}
       activeOpacity={0.82}
       accessibilityRole="button"
-      accessibilityLabel={`${dose.medicineName}, ${STATUS_LABEL[displayStatus]}`}
+      accessibilityLabel={`${dose.medicineName}, ${DOSE_STATUS_LABEL[displayStatus]}`}
       accessibilityState={{ checked: isTaken }}
     >
       <View style={[styles.cardBar, { backgroundColor: color }]} />
@@ -214,7 +219,7 @@ function DoseCard({
           </Text>
         ) : null}
         <View style={[styles.badge, { backgroundColor: color + '22' }]}>
-          <Text style={[styles.badgeText, { color }]}>{STATUS_LABEL[displayStatus]}</Text>
+          <Text style={[styles.badgeText, { color }]}>{DOSE_STATUS_LABEL[displayStatus]}</Text>
         </View>
       </View>
       {canToggle && (
@@ -269,7 +274,7 @@ function DayCell({
       }}
       activeOpacity={1}
       accessibilityRole="button"
-      accessibilityLabel={`Dia ${day}`}
+      accessibilityLabel={`Dia ${day}${status ? `, ${DAY_STATUS_LABEL[status]}` : ''}`}
       accessibilityState={{ selected: isSelected }}
     >
       <Animated.View
@@ -293,7 +298,7 @@ function DayCell({
             <View style={[styles.todayDot, { backgroundColor: C.primary }]} />
           )}
           {status && (
-            <View style={[styles.statusDot, { backgroundColor: STATUS_DOT_COLOR[status] }]} />
+            <View style={[styles.statusDot, dotShapeStyle(status, STATUS_DOT_COLOR[status])]} />
           )}
         </View>
       </Animated.View>
@@ -933,18 +938,18 @@ const styles = StyleSheet.create({
   logoText: { fontSize: 18, fontWeight: '800', color: '#fff' },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   iconBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.18)',
   },
   avatarBtn: {},
   avatarInner: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },

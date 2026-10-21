@@ -1,5 +1,5 @@
+import { invokeScanEdgeFunction } from '@/lib/scanner-client';
 import type { MedicineType } from '@/types';
-import { supabase } from '@/lib/supabase';
 
 export interface PrescriptionData {
   name: string;
@@ -24,38 +24,9 @@ export interface PrescriptionData {
   doctorName?: string;
 }
 
-export async function scanPrescription(base64Image: string): Promise<PrescriptionData[]> {
-  if (!supabase) {
-    throw new Error(
-      'Leitura de receitas requer conta Doser. Faça login para usar esta funcionalidade.'
-    );
-  }
+function validateMedicationsResponse(data: unknown): PrescriptionData[] {
+  const medications = (data as { medications?: PrescriptionData[] })?.medications;
 
-  console.log('[Scanner] Enviando para Edge Function, tamanho base64:', base64Image.length);
-
-  const { data, error } = await supabase.functions.invoke('scan-prescription', {
-    body: { image: base64Image },
-  });
-
-  if (error) {
-    let message = error.message ?? 'Não foi possível analisar a receita. Tente novamente.';
-    if ('context' in error && error.context instanceof Response) {
-      const res = error.context as Response;
-      const body = await res.json().catch(() => ({}));
-      console.error('[Scanner] Erro HTTP', res.status, body);
-      if (body?.error) message = body.error as string;
-    } else {
-      console.error('[Scanner] Erro na Edge Function:', error);
-    }
-    throw new Error(message);
-  }
-
-  if (data?.error) {
-    console.error('[Scanner] Erro retornado pela função:', data.error);
-    throw new Error(data.error as string);
-  }
-
-  const medications = data?.medications as PrescriptionData[] | undefined;
   if (!Array.isArray(medications)) {
     throw new TypeError(
       'Não foi possível interpretar a receita. Verifique se a imagem está legível e tente novamente.'
@@ -68,6 +39,18 @@ export async function scanPrescription(base64Image: string): Promise<Prescriptio
     );
   }
 
+  return medications;
+}
+
+export async function scanPrescription(base64Image: string): Promise<PrescriptionData[]> {
+  const data = await invokeScanEdgeFunction('scan-prescription', base64Image, {
+    logTag: '[Scanner]',
+    authRequiredMessage:
+      'Leitura de receitas requer conta Doser. Faça login para usar esta funcionalidade.',
+    retryDelaysMs: [1500, 3000],
+  });
+
+  const medications = validateMedicationsResponse(data);
   console.log('[Scanner] Parseado com sucesso:', medications.length, 'medicamento(s)');
   return medications;
 }

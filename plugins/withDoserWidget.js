@@ -137,7 +137,7 @@ function copyDirSync(src, dest) {
     const destPath = path.join(dest, item);
     if (fs.statSync(srcPath).isDirectory()) {
       copyDirSync(srcPath, destPath);
-    } else if (!fs.existsSync(destPath)) {
+    } else {
       fs.copyFileSync(srcPath, destPath);
     }
   }

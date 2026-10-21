@@ -1,4 +1,5 @@
 import { getDosesForDateRange } from '@/lib/database';
+import { DOSE_STATUS_LABEL } from '@/lib/dose-status';
 import type { Dose } from '@/types';
 
 interface ReportOptions {
@@ -21,13 +22,6 @@ function fmtDate(iso: string): string {
 
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-}
-
-function statusLabel(status: string): string {
-  if (status === 'taken') return 'Tomado';
-  if (status === 'skipped') return 'Pulado';
-  if (status === 'snoozed') return 'Soneca';
-  return 'Pendente';
 }
 
 function statusColor(status: string): string {
@@ -96,7 +90,7 @@ export async function generateAdherenceReport(opts: ReportOptions): Promise<stri
       <td>${fmtTime(d.scheduledTime)}</td>
       <td>${d.medicineName ?? '-'}</td>
       <td>${d.dosage ?? '-'}</td>
-      <td style="color:${statusColor(d.status)};font-weight:600;">${statusLabel(d.status)}</td>
+      <td style="color:${statusColor(d.status)};font-weight:600;">${DOSE_STATUS_LABEL[d.status]}</td>
       <td>${d.takenTime ? fmtTime(d.takenTime) : '-'}</td>
     </tr>`
     )

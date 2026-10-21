@@ -7,6 +7,14 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/$1',
   },
   collectCoverageFrom: ['app/**/*.{ts,tsx}', 'lib/**/*.{ts,tsx}', '!**/*.d.ts'],
+  coverageThreshold: {
+    global: {
+      statements: 65,
+      branches: 55,
+      functions: 60,
+      lines: 68,
+    },
+  },
   transformIgnorePatterns: [
     'node_modules/(?!(?:.*/)?((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg))',
   ],

@@ -73,7 +73,9 @@ components/   UI components reutilizáveis
 constants/    theme.ts (cores e fontes)
 hooks/        Custom hooks (tema, color scheme)
 lib/          Lógica de negócio e serviços
-  database.ts Única interface com SQLite — toda query passa aqui
+  database/   Única interface com SQLite — toda query passa aqui, dividida por domínio
+              (db, mappers, profiles, medicines, schedules, doses, stock, cache)
+  frequency-strategy.ts Strategy por FrequencyType (interval_hours/specific_days/fixed_cycle)
   store.ts    Zustand: selectedDate, activeProfile, dbReady
   auth.ts     Supabase Auth wrapper
   sync.ts     Sincronização local ↔ cloud
@@ -91,9 +93,13 @@ __tests__/    Testes Jest
 
 ### Banco de dados
 
-- **Toda** operação no SQLite passa por `lib/database.ts` — nunca use `expo-sqlite` diretamente nas screens.
+- **Toda** operação no SQLite passa por `lib/database/` (importado como `@/lib/database`) —
+  nunca use `expo-sqlite` diretamente nas screens. A pasta é dividida por domínio
+  (`profiles.ts`, `medicines.ts`, `schedules.ts`, `doses.ts`, `stock.ts`, `cache.ts`), com
+  `db.ts` (conexão/infra) e `mappers.ts` (row → domínio) compartilhados, e `index.ts`
+  reexportando tudo — o import `@/lib/database` não muda.
 - Funções de escrita exigem `setActiveProfileId()` configurado; se não estiver, lança erro.
-- Novas colunas: use o padrão `ensureColumn(table, column, definition)` já existente.
+- Novas colunas: use o padrão `ensureColumn(table, column, definition)` já existente (em `lib/database/db.ts`).
 - Novas tabelas ou alterações destrutivas: documente no SDD (`docs/SDD.md`).
 
 ### Estado
@@ -118,7 +124,7 @@ __tests__/    Testes Jest
 **Local-first:** SQLite é a fonte de verdade. Supabase é backup/sync opcional.
 
 ```text
-Screen → React Query → lib/database.ts → SQLite
+Screen → React Query → lib/database/ → SQLite
                     ↕ (sync periódico)
               lib/sync.ts → Supabase
 ```

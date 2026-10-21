@@ -5,6 +5,7 @@ import { Text } from '@/components/ui/text/Text';
 import { useDoseForm } from '@/hooks/use-dose-form';
 import { useDose } from '@/hooks/use-doses';
 import { useTheme } from '@/hooks/use-theme';
+import { localDateStr } from '@/lib/date';
 import {
   getDosesForDate,
   realignIntervalSchedule,
@@ -58,7 +59,7 @@ async function rescheduleAfterRealign(scheduleId: number): Promise<void> {
   for (let i = 0; i < 7; i++) {
     const d = new Date(now);
     d.setDate(d.getDate() + i);
-    const dateStr = d.toISOString().split('T')[0];
+    const dateStr = localDateStr(d);
     const dayDoses = await getDosesForDate(dateStr);
 
     for (const futureDose of dayDoses) {

@@ -52,3 +52,5 @@ app-example
 
 # Supabase CLI temp files
 supabase/.temp/
+
+coverage/

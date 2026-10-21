@@ -7,13 +7,9 @@ import { SuccessToast } from '@/components/ui/toast/SuccessToast';
 import { Text } from '@/components/ui/text/Text';
 import { useMedicines } from '@/hooks/use-medicines';
 import { useTheme } from '@/hooks/use-theme';
-import {
-  createSchedule,
-  generateDosesForSchedule,
-  getDosesForDate,
-  updateDoseNotificationId,
-} from '@/lib/database';
-import { scheduleDoseNotification } from '@/lib/notifications';
+import { createSchedule } from '@/lib/database';
+import { finalizeNewSchedule } from '@/lib/dose-scheduling';
+import { localDateStr } from '@/lib/date';
 import { invalidateTrackingQueries } from '@/lib/query-keys';
 import type { FrequencyType } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,10 +20,6 @@ import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-nat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-
-function todayStr() {
-  return new Date().toISOString().split('T')[0];
-}
 
 function dosagePlaceholder(type: string | undefined): string {
   if (type === 'ml') return 'Ex: 10mL';
@@ -115,7 +107,7 @@ export default function AddScheduleScreen() {
   const [daysOff, setDaysOff] = useState('7');
   const [times, setTimes] = useState<string[]>(['08:00']);
   const [timeInput, setTimeInput] = useState('');
-  const [startDate, setStartDate] = useState(todayStr());
+  const [startDate, setStartDate] = useState(localDateStr());
   const [endDate, setEndDate] = useState('');
 
   const C = useTheme();
@@ -145,27 +137,8 @@ export default function AddScheduleScreen() {
         isActive: true,
       });
 
-      await generateDosesForSchedule(schedule, 30);
-
       const medName = medicines.find(m => m.id === selectedMedId)?.name ?? '';
-      const now = new Date();
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(now);
-        d.setDate(d.getDate() + i);
-        const dateStr = d.toISOString().split('T')[0];
-        const doses = await getDosesForDate(dateStr);
-        for (const dose of doses) {
-          if (dose.scheduleId === schedule.id && new Date(dose.scheduledTime) > now) {
-            const notifId = await scheduleDoseNotification({
-              id: dose.id,
-              medicineName: medName,
-              dosage: schedule.dosage,
-              scheduledTime: dose.scheduledTime,
-            });
-            if (notifId) await updateDoseNotificationId(dose.id, notifId);
-          }
-        }
-      }
+      await finalizeNewSchedule(schedule, medName);
     },
     onSuccess: () => {
       invalidateTrackingQueries(qc);
@@ -322,7 +295,7 @@ export default function AddScheduleScreen() {
               onChangeText={setDoseQuantity}
               style={styles.shortInput}
             />
-            <Text variant="body" color={C.text}>
+            <Text variant="body" color={C.text} style={styles.inlineRowLabel}>
               {selectedMed?.stockUnit ?? 'unidade(s)'} do estoque por dose
             </Text>
           </View>
@@ -413,7 +386,7 @@ export default function AddScheduleScreen() {
                     onChangeText={setIntervalHours}
                     style={styles.shortInput}
                   />
-                  <Text variant="body" color={C.text}>
+                  <Text variant="body" color={C.text} style={styles.inlineRowLabel}>
                     horas
                   </Text>
                 </View>
@@ -429,7 +402,7 @@ export default function AddScheduleScreen() {
                       onChangeText={setDaysOn}
                       style={styles.shortInput}
                     />
-                    <Text variant="body" color={C.text}>
+                    <Text variant="body" color={C.text} style={styles.inlineRowLabel}>
                       dias tomando
                     </Text>
                   </View>
@@ -441,7 +414,7 @@ export default function AddScheduleScreen() {
                       onChangeText={setDaysOff}
                       style={styles.shortInput}
                     />
-                    <Text variant="body" color={C.text}>
+                    <Text variant="body" color={C.text} style={styles.inlineRowLabel}>
                       dias de pausa
                     </Text>
                   </View>
@@ -556,9 +529,9 @@ const styles = StyleSheet.create({
   segText: { textAlign: 'center', fontWeight: '600' },
   daysWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, padding: 12 },
   dayBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
@@ -566,6 +539,7 @@ const styles = StyleSheet.create({
   dayText: { fontWeight: '700' },
   inlineRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 },
   shortInput: { width: 72 },
+  inlineRowLabel: { flexShrink: 1 },
   cycleWrap: { gap: 0 },
 
   // Times

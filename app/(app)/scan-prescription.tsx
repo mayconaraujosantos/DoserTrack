@@ -4,15 +4,9 @@ import { Input } from '@/components/ui/input/Input';
 import { SuccessToast } from '@/components/ui/toast/SuccessToast';
 import { Text } from '@/components/ui/text/Text';
 import { useTheme } from '@/hooks/use-theme';
-import {
-  createMedicine,
-  createSchedule,
-  generateDosesForSchedule,
-  getDosesForDate,
-  updateDoseNotificationId,
-  updateDoseStatus,
-} from '@/lib/database';
-import { scheduleDoseNotification } from '@/lib/notifications';
+import { localDateStr } from '@/lib/date';
+import { createMedicine, createSchedule } from '@/lib/database';
+import { finalizeNewSchedule } from '@/lib/dose-scheduling';
 import { invalidateTrackingQueries } from '@/lib/query-keys';
 import { scanPrescription, type PrescriptionData } from '@/lib/prescription-scanner';
 import { cachePrescription, clearPrescriptionCache, getCachedPrescription } from '@/lib/scan-cache';
@@ -21,6 +15,7 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
+import type { FrequencyConfig } from '@/types';
 import {
   ActivityIndicator,
   Alert,
@@ -55,14 +50,10 @@ const TYPE_LABELS: Record<string, string> = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function todayStr() {
-  return new Date().toISOString().split('T')[0];
-}
-
 function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return localDateStr(d);
 }
 
 /**
@@ -78,7 +69,7 @@ function anchorForInterval(frequencyHours: number): string {
 }
 
 function smartStartDate(times: string[]): string {
-  const today = todayStr();
+  const today = localDateStr();
   const now = new Date();
   const allPassed = times.every(t => {
     const [h, m] = t.split(':').map(Number);
@@ -123,7 +114,7 @@ function timeHintsToSchedule(
     const match = HINT_MAP[key];
     if (match && !matched.includes(match)) matched.push(match);
   }
-  if (matched.length > 0) return matched.sort();
+  if (matched.length > 0) return matched.sort((a, b) => a.localeCompare(b));
 
   const n = timesPerDay ?? 1;
   if (n === 1) return ['08:00'];
@@ -145,6 +136,62 @@ interface ConfirmState {
 }
 
 type SavedPrescriptionData = PrescriptionData & { _saved?: boolean };
+
+function getPrescriptionEndDate(state: ConfirmState): string | undefined {
+  const duration = Number.parseInt(state.durationDays);
+  if (state.isContinuous || Number.isNaN(duration) || duration <= 0) return undefined;
+  return addDays(state.startDate, duration - 1);
+}
+
+function getPrescriptionFrequencyConfig(item: PrescriptionData, times: string[]): FrequencyConfig {
+  if (item.frequencyHours) {
+    return { type: 'interval_hours', intervalHours: item.frequencyHours, times };
+  }
+  if (item.timesPerWeek) {
+    return { type: 'specific_days', specificDays: [1], times };
+  }
+  return { type: 'specific_days', specificDays: [0, 1, 2, 3, 4, 5, 6], times };
+}
+
+async function createPrescriptionSchedule(
+  state: ConfirmState,
+  medicineId: number,
+  medicineName: string
+): Promise<void> {
+  if (state.item.isSos === true) return;
+
+  const schedule = await createSchedule({
+    medicineId,
+    dosage: state.dosage,
+    doseQuantity: 1,
+    frequencyConfig: getPrescriptionFrequencyConfig(state.item, state.times),
+    startDate: state.startDate,
+    endDate: getPrescriptionEndDate(state),
+    isActive: true,
+  });
+  await finalizeNewSchedule(schedule, medicineName);
+}
+
+function getPrescriptionSaveToast(
+  item: PrescriptionData,
+  medicineName: string,
+  allSaved: boolean
+): { title: string; message: string } {
+  if (allSaved) {
+    return {
+      title: 'Receita concluída com sucesso!',
+      message: 'Todos os medicamentos detectados foram salvos. Scanner limpo para nova receita.',
+    };
+  }
+
+  const isSos = item.isSos === true;
+  return {
+    title: isSos ? 'Medicamento salvo com sucesso!' : 'Receita salva com sucesso!',
+    message: isSos
+      ? `${medicineName} foi adicionado como uso condicional (SOS).`
+      : `${medicineName} foi adicionado com horários e doses iniciais gerados.`,
+  };
+}
 
 // ─── TimeChipRow ─────────────────────────────────────────────────────────────
 
@@ -268,13 +315,16 @@ function ConfirmInlineEditor({
 
   const isSos = state.item.isSos === true;
 
-  const freqLabel = state.item.frequencyHours
-    ? `A cada ${state.item.frequencyHours}h`
-    : state.item.timesPerDay
-      ? `${state.item.timesPerDay}x ao dia`
-      : state.item.timesPerWeek
-        ? `${state.item.timesPerWeek}x por semana`
-        : 'Conforme receita';
+  let freqLabel: string;
+  if (state.item.frequencyHours) {
+    freqLabel = `A cada ${state.item.frequencyHours}h`;
+  } else if (state.item.timesPerDay) {
+    freqLabel = `${state.item.timesPerDay}x ao dia`;
+  } else if (state.item.timesPerWeek) {
+    freqLabel = `${state.item.timesPerWeek}x por semana`;
+  } else {
+    freqLabel = 'Conforme receita';
+  }
 
   function handleConfirm() {
     if (!isSos && times.length === 0) {
@@ -306,7 +356,12 @@ function ConfirmInlineEditor({
             </Text>
           )}
         </View>
-        <TouchableOpacity onPress={onCancel} accessibilityLabel="Fechar editor">
+        <TouchableOpacity
+          onPress={onCancel}
+          accessibilityLabel="Fechar editor"
+          accessibilityRole="button"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <Ionicons name="close" size={24} color={C.sub} />
         </TouchableOpacity>
       </View>
@@ -363,7 +418,7 @@ function ConfirmInlineEditor({
           >
             <Ionicons name="calendar-outline" size={16} color={C.primary} />
             <Text variant="caption" color={C.primary}>
-              {state.startDate === todayStr()
+              {state.startDate === localDateStr()
                 ? `Primeira dose hoje às ${times[0]}`
                 : `Primeira dose amanhã às ${times[0]} — horários de hoje já passaram`}
             </Text>
@@ -597,12 +652,12 @@ function ResultRow({
   value,
   C,
   small,
-}: {
+}: Readonly<{
   label: string;
   value: string;
   C: ReturnType<typeof useTheme>;
   small?: boolean;
-}) {
+}>) {
   return (
     <View style={[styles.resultRow, { borderBottomColor: C.border }]}>
       <Text variant="caption" color={C.sub} style={styles.resultLabel}>
@@ -706,8 +761,7 @@ export default function ScanPrescriptionScreen() {
   }
 
   async function handleConfirmSave(state: ConfirmState) {
-    const { item, times, durationDays, isContinuous, dosage } = state;
-    const isSos = item.isSos === true;
+    const { item } = state;
     setSavingKey(item.name);
     setConfirmState(null);
 
@@ -720,95 +774,15 @@ export default function ScanPrescriptionScreen() {
         stockUnit: UNITS[item.type] ?? 'unidades',
         lowStockThreshold: 2,
       });
-
-      if (!isSos) {
-        const today = state.startDate;
-        const parsedDuration = Number.parseInt(durationDays);
-        const endDate =
-          !isContinuous && !Number.isNaN(parsedDuration) && parsedDuration > 0
-            ? addDays(today, parsedDuration - 1)
-            : undefined;
-
-        let freqConfig;
-        if (item.frequencyHours) {
-          freqConfig = {
-            type: 'interval_hours' as const,
-            intervalHours: item.frequencyHours,
-            times,
-          };
-        } else if (item.timesPerWeek) {
-          freqConfig = { type: 'specific_days' as const, specificDays: [1], times };
-        } else {
-          freqConfig = {
-            type: 'specific_days' as const,
-            specificDays: [0, 1, 2, 3, 4, 5, 6],
-            times,
-          };
-        }
-
-        const schedule = await createSchedule({
-          medicineId: medicine.id,
-          dosage,
-          doseQuantity: 1,
-          frequencyConfig: freqConfig,
-          startDate: today,
-          endDate,
-          isActive: true,
-        });
-
-        await generateDosesForSchedule(schedule, 30);
-
-        // Marca como skipped doses já passadas no dia de hoje para evitar status "atrasado" imediato
-        const now = new Date();
-        const realToday = todayStr();
-        const todayDoses = await getDosesForDate(realToday);
-        for (const dose of todayDoses) {
-          if (dose.scheduleId === schedule.id && new Date(dose.scheduledTime) <= now) {
-            await updateDoseStatus(dose.id, 'skipped');
-          }
-        }
-
-        for (let i = 0; i < 7; i++) {
-          const d = new Date(now);
-          d.setDate(d.getDate() + i);
-          const dateStr = d.toISOString().split('T')[0];
-          const doses = await getDosesForDate(dateStr);
-          for (const dose of doses) {
-            if (dose.scheduleId === schedule.id && new Date(dose.scheduledTime) > now) {
-              const notifId = await scheduleDoseNotification({
-                id: dose.id,
-                medicineName: medicine.name,
-                dosage: schedule.dosage,
-                scheduledTime: dose.scheduledTime,
-              });
-              if (notifId) await updateDoseNotificationId(dose.id, notifId);
-            }
-          }
-        }
-      }
+      await createPrescriptionSchedule(state, medicine.id, medicine.name);
 
       const updatedResults = results.map(r => (r === item ? { ...r, _saved: true } : r));
       setResults(updatedResults);
       const allSaved = updatedResults.length > 0 && updatedResults.every(r => r._saved === true);
 
       invalidateTrackingQueries(qc);
-
-      if (allSaved) {
-        setResetAfterToast(true);
-        setSuccessToast({
-          title: 'Receita concluída com sucesso!',
-          message:
-            'Todos os medicamentos detectados foram salvos. Scanner limpo para nova receita.',
-        });
-      } else {
-        setResetAfterToast(false);
-        setSuccessToast({
-          title: isSos ? 'Medicamento salvo com sucesso!' : 'Receita salva com sucesso!',
-          message: isSos
-            ? `${medicine.name} foi adicionado como uso condicional (SOS).`
-            : `${medicine.name} foi adicionado com horários e doses iniciais gerados.`,
-        });
-      }
+      setResetAfterToast(allSaved);
+      setSuccessToast(getPrescriptionSaveToast(item, medicine.name, allSaved));
     } catch (err) {
       Alert.alert('Erro ao salvar', err instanceof Error ? err.message : 'Tente novamente.');
     } finally {

@@ -24,7 +24,9 @@ jest.mock('expo-secure-store', () => ({
 // expo-haptics
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(),
-  ImpactFeedbackStyle: { Light: 'Light' },
+  notificationAsync: jest.fn(),
+  ImpactFeedbackStyle: { Light: 'Light', Medium: 'Medium', Heavy: 'Heavy' },
+  NotificationFeedbackType: { Success: 'Success', Warning: 'Warning', Error: 'Error' },
 }));
 
 // expo-image-picker

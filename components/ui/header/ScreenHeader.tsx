@@ -52,9 +52,9 @@ export const headerBtnStyle = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.18)',
   },
   iconOnly: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.18)',
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   center: { flex: 1, gap: 2 },
-  side: { minWidth: 40 },
+  side: { minWidth: 44 },
   rightSide: { alignItems: 'flex-end' },
   title: {
     fontSize: 22,

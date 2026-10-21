@@ -4,15 +4,11 @@ import { DatePickerInput } from '@/components/ui/input/date-picker-input';
 import { TimePickerInput } from '@/components/ui/input/time-picker-input';
 import type { ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import {
-  createMedicine,
-  createSchedule,
-  generateDosesForSchedule,
-  getDosesForDate,
-  updateDoseNotificationId,
-} from '@/lib/database';
+import { localDateStr } from '@/lib/date';
+import { createMedicine, createSchedule } from '@/lib/database';
+import { finalizeNewSchedule } from '@/lib/dose-scheduling';
 import { haptic } from '@/lib/haptics';
-import { notifyLowStock, scheduleDoseNotification } from '@/lib/notifications';
+import { notifyLowStock } from '@/lib/notifications';
 import { invalidateTrackingQueries } from '@/lib/query-keys';
 import { syncToCloud } from '@/lib/sync';
 import type { FrequencyConfig, FrequencyType, MedicineType } from '@/types';
@@ -63,10 +59,6 @@ const UNITS: Record<MedicineType, string> = {
 const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 const EASING = Easing.out(Easing.cubic);
-
-function todayStr() {
-  return new Date().toISOString().split('T')[0];
-}
 
 // ─── Step Dots ────────────────────────────────────────────────────────────────
 
@@ -581,9 +573,9 @@ const s3 = StyleSheet.create({
   checkmark: { marginLeft: 'auto' },
   daysRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   dayBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: StyleSheet.hairlineWidth,
@@ -652,7 +644,7 @@ export default function AddMedicineScreen() {
   const [daysOn, setDaysOn] = useState('21');
   const [daysOff, setDaysOff] = useState('7');
   const [times, setTimes] = useState<string[]>(['08:00']);
-  const [startDate, setStartDate] = useState(todayStr());
+  const [startDate, setStartDate] = useState(localDateStr());
 
   // ── Navigation
   const [step, setStep] = useState(0);
@@ -767,25 +759,7 @@ export default function AddMedicineScreen() {
           isActive: true,
         });
 
-        await generateDosesForSchedule(schedule, 30);
-
-        const now = new Date();
-        for (let i = 0; i < 7; i++) {
-          const d = new Date(now);
-          d.setDate(d.getDate() + i);
-          const doses = await getDosesForDate(d.toISOString().split('T')[0]);
-          for (const dose of doses) {
-            if (dose.scheduleId === schedule.id && new Date(dose.scheduledTime) > now) {
-              const notifId = await scheduleDoseNotification({
-                id: dose.id,
-                medicineName: medicine.name,
-                dosage: schedule.dosage,
-                scheduledTime: dose.scheduledTime,
-              });
-              if (notifId) await updateDoseNotificationId(dose.id, notifId);
-            }
-          }
-        }
+        await finalizeNewSchedule(schedule, medicine.name);
       }
 
       return { medicine, withSchedule };
