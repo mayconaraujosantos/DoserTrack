@@ -16,7 +16,13 @@ import { sendPasswordReset, mapAuthError } from '@/lib/auth';
 import { useTheme } from '@/hooks/use-theme';
 
 function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const value = email.trim();
+  const atIndex = value.indexOf('@');
+  if (atIndex <= 0 || atIndex !== value.lastIndexOf('@')) return false;
+
+  const domain = value.slice(atIndex + 1);
+  const dotIndex = domain.indexOf('.');
+  return dotIndex > 0 && dotIndex < domain.length - 1 && !/\s/.test(value);
 }
 
 export default function ForgotPasswordScreen() {
