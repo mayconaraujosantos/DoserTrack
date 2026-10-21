@@ -1,19 +1,19 @@
+import { useTheme } from '@/hooks/use-theme';
+import { mapAuthError, sendPasswordReset } from '@/lib/auth';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
+  View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { sendPasswordReset, mapAuthError } from '@/lib/auth';
-import { useTheme } from '@/hooks/use-theme';
 
 function isValidEmail(email: string) {
   const value = email.trim();
